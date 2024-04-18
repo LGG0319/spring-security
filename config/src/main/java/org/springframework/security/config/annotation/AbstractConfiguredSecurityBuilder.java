@@ -50,22 +50,33 @@ import org.springframework.web.filter.DelegatingFilterProxy;
  * @param <B> The type of this builder (that is returned by the base class)
  * @author Rob Winch
  * @see WebSecurity
+ * 允许将多个安全配置器SecurityConfigurer应用到该SecurityBuilder上;
+ * 定义了构建过程的生命周期(参考生命周期状态定义BuildState)；
+ * 在生命周期基础之上实现并final了基类定义的抽象方法#doBuild，将构建划分为三个主要阶段#init,#configure,#performBuild;
+ * 对 #init/#configure阶段提供了实现;
+ * 对 #init/#configure阶段提供了前置回调#beforeInit/#beforeConfigure空方法供基类扩展;
+ * #performBuild定义为抽象方法要求子类提供实现；
+ * 登记安全构建器工作过程中需要共享使用的一些对象。
  */
 public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBuilder<O>>
 		extends AbstractSecurityBuilder<O> {
 
 	private final Log logger = LogFactory.getLog(getClass());
 
+	// 所要应用到当前 SecurityBuilder 上的所有的 SecurityConfigurer
 	private final LinkedHashMap<Class<? extends SecurityConfigurer<O, B>>, List<SecurityConfigurer<O, B>>> configurers = new LinkedHashMap<>();
 
+	//  用于记录在初始化期间添加进来的 SecurityConfigurer
 	private final List<SecurityConfigurer<O, B>> configurersAddedInInitializing = new ArrayList<>();
 
+	// 共享对象
 	private final Map<Class<?>, Object> sharedObjects = new HashMap<>();
 
 	private final boolean allowConfigurersOfSameType;
 
 	private BuildState buildState = BuildState.UNBUILT;
 
+	// 对象后置处理器，一般用于对象的初始化或者确保对象的销毁方法能够被调用到
 	private ObjectPostProcessor<Object> objectPostProcessor;
 
 	/***
@@ -137,6 +148,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * @param configurer
 	 * @return the {@link SecurityConfigurerAdapter} for further customizations
 	 * @throws Exception
+	 *  应用一个 SecurityConfigurer 到该 SecurityBuilder 上，
 	 */
 	public <C extends SecurityConfigurer<O, B>> C apply(C configurer) throws Exception {
 		add(configurer);
@@ -192,6 +204,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * Adds {@link SecurityConfigurer} ensuring that it is allowed and invoking
 	 * {@link SecurityConfigurer#init(SecurityBuilder)} immediately if necessary.
 	 * @param configurer the {@link SecurityConfigurer} to add
+	 * 添加 SecurityConfigurer 到当前 SecurityBuilder 上，添加过程做了同步处理
 	 */
 	@SuppressWarnings("unchecked")
 	private <C extends SecurityConfigurer<O, B>> void add(C configurer) {
@@ -318,6 +331,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * <li>Invokes {@link #beforeConfigure()} for any subclass to hook into</li>
 	 * <li>Invokes {@link #performBuild()} which actually builds the Object</li>
 	 * </ul>
+	 * 构建 Security filterChain
 	 */
 	@Override
 	protected final O doBuild() throws Exception {
@@ -329,6 +343,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 			beforeConfigure();
 			configure();
 			this.buildState = BuildState.BUILDING;
+			// 真正的过滤器链构建方法
 			O result = performBuild();
 			this.buildState = BuildState.BUILT;
 			return result;
@@ -355,9 +370,11 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	/**
 	 * Subclasses must implement this method to build the object that is being returned.
 	 * @return the Object to be buit or null if the implementation allows it
+	 * 要求子类必须提供实现的构建过程方法
 	 */
 	protected abstract O performBuild() throws Exception;
 
+	// 构建过程初始化方法 : 调用所有 SecurityConfigurer 的 #init 初始化方法
 	@SuppressWarnings("unchecked")
 	private void init() throws Exception {
 		Collection<SecurityConfigurer<O, B>> configurers = getConfigurers();
@@ -369,6 +386,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 		}
 	}
 
+	// 构建过程配置方法 : 调用所有 SecurityConfigurer 的 #configure 配置方法 将Filter 添加到 FilterChain 中
 	@SuppressWarnings("unchecked")
 	private void configure() throws Exception {
 		Collection<SecurityConfigurer<O, B>> configurers = getConfigurers();
@@ -400,6 +418,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 *
 	 * @author Rob Winch
 	 * @since 3.2
+	 * 构建器构建过程生命周期定义
 	 */
 	private enum BuildState {
 

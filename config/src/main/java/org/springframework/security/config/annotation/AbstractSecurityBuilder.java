@@ -32,6 +32,7 @@ public abstract class AbstractSecurityBuilder<O> implements SecurityBuilder<O> {
 
 	private O object;
 
+	// 构建 Security filterChain
 	@Override
 	public final O build() throws Exception {
 		if (this.building.compareAndSet(false, true)) {

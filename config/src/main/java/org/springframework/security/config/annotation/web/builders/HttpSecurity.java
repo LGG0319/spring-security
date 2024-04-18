@@ -140,6 +140,7 @@ import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
  * @author Joe Grandja
  * @since 3.2
  * @see EnableWebSecurity
+ * 链式调用构建方法，添加不同的Filter,然后经过build() 构建为 FilterChain,在请求时
  */
 public final class HttpSecurity extends AbstractConfiguredSecurityBuilder<DefaultSecurityFilterChain, HttpSecurity>
 		implements SecurityBuilder<DefaultSecurityFilterChain>, HttpSecurityBuilder<HttpSecurity> {
@@ -3247,6 +3248,7 @@ public final class HttpSecurity extends AbstractConfiguredSecurityBuilder<Defaul
 		}
 	}
 
+	// 真正的过滤器链构建方法
 	@SuppressWarnings("unchecked")
 	@Override
 	protected DefaultSecurityFilterChain performBuild() {
@@ -3258,9 +3260,11 @@ public final class HttpSecurity extends AbstractConfiguredSecurityBuilder<Defaul
 				"authorizeHttpRequests cannot be used in conjunction with authorizeRequests. Please select just one.");
 		this.filters.sort(OrderComparator.INSTANCE);
 		List<Filter> sortedFilters = new ArrayList<>(this.filters.size());
+		// Filter 排序
 		for (Filter filter : this.filters) {
 			sortedFilters.add(((OrderedFilter) filter).filter);
 		}
+		// 生成默认 FilterChain
 		return new DefaultSecurityFilterChain(this.requestMatcher, sortedFilters);
 	}
 
@@ -3302,6 +3306,7 @@ public final class HttpSecurity extends AbstractConfiguredSecurityBuilder<Defaul
 		return this;
 	}
 
+	// 添加过滤器
 	@Override
 	public HttpSecurity addFilter(Filter filter) {
 		Integer order = this.filterOrders.getOrder(filter.getClass());
