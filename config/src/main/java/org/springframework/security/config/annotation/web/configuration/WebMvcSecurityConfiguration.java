@@ -129,6 +129,10 @@ class WebMvcSecurityConfiguration implements WebMvcConfigurer, ApplicationContex
 			public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
 			}
 
+			// 注入 springSecurityFilterChain 对象 与 CompositeFilterChainProxy 对象
+			// springSecurityFilterChain
+			// CompositeFilterChainProxy 包含两个 Filter{HandlerMappingIntrospectorCacheFilterFactoryBean：处理器映射，FilterChainProxy:已注入所有 security 相关 Filter}
+			// 其中 CompositeFilter 的doFilter() 为security Filter正式执行入口
 			@Override
 			public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
 				if (!registry.containsBeanDefinition(HANDLER_MAPPING_INTROSPECTOR_BEAN_NAME)) {

@@ -37,6 +37,7 @@ class SpringWebMvcImportSelector implements ImportSelector {
 		webMvcPresent = ClassUtils.isPresent("org.springframework.web.servlet.DispatcherServlet", classLoader);
 	}
 
+	// 向 spring 容器中注入 WebMvcSecurityConfiguration 对象
 	@Override
 	public String[] selectImports(AnnotationMetadata importingClassMetadata) {
 		if (!webMvcPresent) {
