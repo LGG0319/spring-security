@@ -86,19 +86,31 @@ import org.springframework.util.CollectionUtils;
  * @author Ben Alex
  * @author Luke Taylor
  * @see DefaultAuthenticationEventPublisher
+ * 1.Spring Security提供的AuthenticationManager实现。其主要目的，也就是实现AuthenticationManager接口所定义的方法
+ * 2.ProviderManager 使用一组AuthenticationProvider,也可以再附加一个双亲认证管理器AuthenticationManager来完成对一个认证请求，
+ * 	也就是一个认证令牌对象authentication的认证。
+ * 3.ProviderManager的认证过程也会发布相应的认证成功/异常事件
+ * 4.ProviderManager的认证逻辑会遍历所有支持该认证令牌对象参数 authentication （基于类型进行匹配）的 AuthenticationProvider，
+ * 	找到第一个能成功认证的并返回填充更多信息的authentication 对象：
  */
 public class ProviderManager implements AuthenticationManager, MessageSourceAware, InitializingBean {
 
 	private static final Log logger = LogFactory.getLog(ProviderManager.class);
 
+	// 认证事件发布器，这里缺省初始化为 NullEventPublisher,表示不做认证事件的发布
 	private AuthenticationEventPublisher eventPublisher = new NullEventPublisher();
 
+	// 用于记录所要使用的各个 AuthenticationProvider， 当前 ProviderManager 的认证
+	// 任务最终委托给这组 AuthenticationProvider 完成
 	private List<AuthenticationProvider> providers = Collections.emptyList();
 
 	protected MessageSourceAccessor messages = SpringSecurityMessageSource.getAccessor();
 
+	// 双亲认证管理器，可以设置，也可以不设置，设置的话会在当前认证管理器 ProviderManager
+	// 不能认证某个用户时再尝试使用该双亲认证管理器认证用户
 	private AuthenticationManager parent;
 
+	// 认证成功时是否擦除认证令牌对象中的凭证信息(比如密码)，缺省值为 true
 	private boolean eraseCredentialsAfterAuthentication = true;
 
 	/**
@@ -112,6 +124,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 	/**
 	 * Construct a {@link ProviderManager} using the given {@link AuthenticationProvider}s
 	 * @param providers the {@link AuthenticationProvider}s to use
+	 * 构造函数，指定一组要使用的 AuthenticationProvider，并且双亲认证管理器设置为 null
 	 */
 	public ProviderManager(List<AuthenticationProvider> providers) {
 		this(providers, null);
@@ -121,6 +134,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 	 * Construct a {@link ProviderManager} using the provided parameters
 	 * @param providers the {@link AuthenticationProvider}s to use
 	 * @param parent a parent {@link AuthenticationManager} to fall back to
+	 * 构造函数，指定一组要使用的 AuthenticationProvider，并且双亲认证管理器设置为指定值
 	 */
 	public ProviderManager(List<AuthenticationProvider> providers, AuthenticationManager parent) {
 		Assert.notNull(providers, "providers list cannot be null");
@@ -129,6 +143,9 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 		checkState();
 	}
 
+	// InitializingBean 接口定义的bean初始化方法，会在该bean创建过程中初始化阶段被调用，
+	// 这里的实现仅仅检查必要的工作组件是否被设置，如果没有被设置，则抛出异常
+	// IllegalArgumentException
 	@Override
 	public void afterPropertiesSet() {
 		checkState();
@@ -160,9 +177,17 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 	 * @param authentication the authentication request object.
 	 * @return a fully authenticated object including credentials.
 	 * @throws AuthenticationException if authentication fails.
+	 * 1.尝试对认证请求对象，也就是认证令牌对象参数 authentication 进行认证
+	 * 2.该方法的逻辑会遍历所有支持该认证令牌对象参数 authentication （基于类型进行匹配）
+	 *  的 AuthenticationProvider，找到第一个能成功认证的并返回填充更多信息的authentication 对象：
+	 * 3. 如果某个 AuthenticationProvider 宣称可以认证该 authentication，但是认证过程抛出异常 AuthenticationException，则整个认证过程不会停止,
+	 *  而是尝试使用下一个 AuthenticationProvider 继续,知道认证成功，或者执行完所有的AuthenticationProvider。
+	 * 4.认证成功时，该方法也会调用 eventPublisher 发布认证成功事件。
+	 * 5.认证异常时，该方法回调用 eventPublisher 发布相应的认证异常事件。
 	 */
 	@Override
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+		// 获取当前的Authentication的认证类型
 		Class<? extends Authentication> toTest = authentication.getClass();
 		AuthenticationException lastException = null;
 		AuthenticationException parentException = null;
@@ -170,7 +195,9 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 		Authentication parentResult = null;
 		int currentPosition = 0;
 		int size = this.providers.size();
+		// 遍历所有的providers
 		for (AuthenticationProvider provider : getProviders()) {
+			// 判断该provider是否支持当前的认证类型。不支持，遍历下一个
 			if (!provider.supports(toTest)) {
 				continue;
 			}
@@ -179,8 +206,10 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 						provider.getClass().getSimpleName(), ++currentPosition, size));
 			}
 			try {
+				// 调用provider的authenticat方法认证
 				result = provider.authenticate(authentication);
 				if (result != null) {
+					// 认证通过的话，将认证结果的details赋值到当前认证对象authentication。然后跳出循环
 					copyDetails(authentication, result);
 					break;
 				}
@@ -195,6 +224,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 				lastException = ex;
 			}
 		}
+		// 双亲认证管理器不为空的话继续使用认证
 		if (result == null && this.parent != null) {
 			// Allow the parent to try.
 			try {
@@ -244,6 +274,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 		throw lastException;
 	}
 
+	// 发布认证异常事件
 	@SuppressWarnings("deprecation")
 	private void prepareException(AuthenticationException ex, Authentication auth) {
 		this.eventPublisher.publishAuthenticationFailure(ex, auth);
@@ -270,6 +301,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 		this.messages = new MessageSourceAccessor(messageSource);
 	}
 
+	// 指定事件发布器，用于覆盖缺省的 NullEventPublisher
 	public void setAuthenticationEventPublisher(AuthenticationEventPublisher eventPublisher) {
 		Assert.notNull(eventPublisher, "AuthenticationEventPublisher cannot be null");
 		this.eventPublisher = eventPublisher;
@@ -291,6 +323,8 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 		return this.eraseCredentialsAfterAuthentication;
 	}
 
+	// 这是一个缺省使用的认证事件发布器实现类，实际上并不发布任何认证事件，只是为了避免
+	// ProviderManager 的属性 eventPublisher 为 null
 	private static final class NullEventPublisher implements AuthenticationEventPublisher {
 
 		@Override

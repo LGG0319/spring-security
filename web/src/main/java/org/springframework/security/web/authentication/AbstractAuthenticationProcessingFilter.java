@@ -118,26 +118,34 @@ public abstract class AbstractAuthenticationProcessingFilter extends GenericFilt
 	private SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
 		.getContextHolderStrategy();
 
+	// 事件发布管理器
 	protected ApplicationEventPublisher eventPublisher;
 
 	protected AuthenticationDetailsSource<HttpServletRequest, ?> authenticationDetailsSource = new WebAuthenticationDetailsSource();
 
 	private AuthenticationManager authenticationManager;
 
+	// 认证管理器，定义了SpringSecurity如何进行认证操作
+	// 认证成功后会返回一个Authentication对象，这个对象会被设置到SecurityContextHolder中
 	protected MessageSourceAccessor messages = SpringSecurityMessageSource.getAccessor();
 
+	// 如果用户开启了类似“记住我”之类的免密码登录，RememberMeServices来进行管理。
 	private RememberMeServices rememberMeServices = new NullRememberMeServices();
 
+	// 请求匹配器，定义了match()方法，匹配请求HttpServletRequest是否符合定义的规则
 	private RequestMatcher requiresAuthenticationRequestMatcher;
 
 	private boolean continueChainBeforeSuccessfulAuthentication = false;
 
+	// 会话验证管理
 	private SessionAuthenticationStrategy sessionStrategy = new NullAuthenticatedSessionStrategy();
 
 	private boolean allowSessionCreation = true;
 
+	// 用户登录成功的后续处理
 	private AuthenticationSuccessHandler successHandler = new SavedRequestAwareAuthenticationSuccessHandler();
 
+	// 用户登录失败的后续处理
 	private AuthenticationFailureHandler failureHandler = new SimpleUrlAuthenticationFailureHandler();
 
 	private SecurityContextRepository securityContextRepository = new RequestAttributeSecurityContextRepository();
@@ -223,29 +231,36 @@ public abstract class AbstractAuthenticationProcessingFilter extends GenericFilt
 
 	private void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
+		// 判断是否需要认证
 		if (!requiresAuthentication(request, response)) {
+			// 如果不需要认证，继续执行下一个过滤器
 			chain.doFilter(request, response);
 			return;
 		}
 		try {
+			// 进行认证处理,该方法需要子类去重写
 			Authentication authenticationResult = attemptAuthentication(request, response);
 			if (authenticationResult == null) {
 				// return immediately as subclass has indicated that it hasn't completed
 				return;
 			}
+			// 身份认证成功，保存session
 			this.sessionStrategy.onAuthentication(authenticationResult, request, response);
 			// Authentication success
 			if (this.continueChainBeforeSuccessfulAuthentication) {
 				chain.doFilter(request, response);
 			}
+			// 认证成功的处理逻辑
 			successfulAuthentication(request, response, chain, authenticationResult);
 		}
 		catch (InternalAuthenticationServiceException failed) {
 			this.logger.error("An internal error occurred while trying to authenticate the user.", failed);
+			// 认证失败的处理逻辑
 			unsuccessfulAuthentication(request, response, failed);
 		}
 		catch (AuthenticationException ex) {
 			// Authentication failed
+			// 认证失败的处理逻辑
 			unsuccessfulAuthentication(request, response, ex);
 		}
 	}
@@ -261,6 +276,7 @@ public abstract class AbstractAuthenticationProcessingFilter extends GenericFilt
 	 * Subclasses may override for special requirements, such as Tapestry integration.
 	 * @return <code>true</code> if the filter should attempt authentication,
 	 * <code>false</code> otherwise.
+	 * 判断该filter是否需要处理该次请求，即请求的路径和该filter配置的要处理的url是否匹配
 	 */
 	protected boolean requiresAuthentication(HttpServletRequest request, HttpServletResponse response) {
 		if (this.requiresAuthenticationRequestMatcher.matches(request)) {
@@ -291,6 +307,7 @@ public abstract class AbstractAuthenticationProcessingFilter extends GenericFilt
 	 * redirect as part of a multi-stage authentication process (such as OIDC).
 	 * @return the authenticated user token, or null if authentication is incomplete.
 	 * @throws AuthenticationException if authentication fails.
+	 * 需要子类提供身份认证的具体实现
 	 */
 	public abstract Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
 			throws AuthenticationException, IOException, ServletException;
@@ -316,9 +333,11 @@ public abstract class AbstractAuthenticationProcessingFilter extends GenericFilt
 	 * method.
 	 * @throws IOException
 	 * @throws ServletException
+	 * 认证成功的处理逻辑
 	 */
 	protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain,
 			Authentication authResult) throws IOException, ServletException {
+		// 将认证成功的用户信息保存到 SecurityContextHolder
 		SecurityContext context = this.securityContextHolderStrategy.createEmptyContext();
 		context.setAuthentication(authResult);
 		this.securityContextHolderStrategy.setContext(context);
@@ -326,10 +345,13 @@ public abstract class AbstractAuthenticationProcessingFilter extends GenericFilt
 		if (this.logger.isDebugEnabled()) {
 			this.logger.debug(LogMessage.format("Set SecurityContextHolder to %s", authResult));
 		}
+		// 处理记住我逻辑
 		this.rememberMeServices.loginSuccess(request, response, authResult);
+		// 发布时间，即发布认证成功消息，供其他的bean接收和处理
 		if (this.eventPublisher != null) {
 			this.eventPublisher.publishEvent(new InteractiveAuthenticationSuccessEvent(authResult, this.getClass()));
 		}
+		// 认证成功的处理逻辑
 		this.successHandler.onAuthenticationSuccess(request, response, authResult);
 	}
 
@@ -343,14 +365,18 @@ public abstract class AbstractAuthenticationProcessingFilter extends GenericFilt
 	 * <li>Delegates additional behaviour to the
 	 * {@link AuthenticationFailureHandler}.</li>
 	 * </ol>
+	 * 认证失败的处理逻辑
 	 */
 	protected void unsuccessfulAuthentication(HttpServletRequest request, HttpServletResponse response,
 			AuthenticationException failed) throws IOException, ServletException {
+		// 清除 SecurityContextHolder 存储的认证信息
 		this.securityContextHolderStrategy.clearContext();
 		this.logger.trace("Failed to process authentication request", failed);
 		this.logger.trace("Cleared SecurityContextHolder");
 		this.logger.trace("Handling authentication failure");
+		// 清除 rememberMe 存储的认证信息
 		this.rememberMeServices.loginFail(request, response);
+		// 认证失败的后续处理
 		this.failureHandler.onAuthenticationFailure(request, response, failed);
 	}
 

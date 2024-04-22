@@ -81,12 +81,16 @@ public class DaoAuthenticationProvider extends AbstractUserDetailsAuthentication
 	@SuppressWarnings("deprecation")
 	protected void additionalAuthenticationChecks(UserDetails userDetails,
 			UsernamePasswordAuthenticationToken authentication) throws AuthenticationException {
+		// 密码为空，则直接抛出异常
 		if (authentication.getCredentials() == null) {
 			this.logger.debug("Failed to authenticate since no credentials provided");
 			throw new BadCredentialsException(this.messages
 				.getMessage("AbstractUserDetailsAuthenticationProvider.badCredentials", "Bad credentials"));
 		}
+		// 获取用户输入的密码
 		String presentedPassword = authentication.getCredentials().toString();
+		// 将缓存中的密码(也可能是自定义查询的密码)与用户输入密码匹配
+		// 如果匹配不上，则抛出异常
 		if (!this.passwordEncoder.matches(presentedPassword, userDetails.getPassword())) {
 			this.logger.debug("Failed to authenticate since password does not match stored value");
 			throw new BadCredentialsException(this.messages
@@ -99,12 +103,15 @@ public class DaoAuthenticationProvider extends AbstractUserDetailsAuthentication
 		Assert.notNull(this.userDetailsService, "A UserDetailsService must be set");
 	}
 
+	// 调用UserDetailsService接口的loadUserByUsername获取用户信息
+	// 通过实现UserDetailsService接口来扩展对用户密码的校验
 	@Override
 	protected final UserDetails retrieveUser(String username, UsernamePasswordAuthenticationToken authentication)
 			throws AuthenticationException {
 		prepareTimingAttackProtection();
 		try {
 			UserDetails loadedUser = this.getUserDetailsService().loadUserByUsername(username);
+			// 如果找不到该用户，则抛出异常
 			if (loadedUser == null) {
 				throw new InternalAuthenticationServiceException(
 						"UserDetailsService returned null, which is an interface contract violation");

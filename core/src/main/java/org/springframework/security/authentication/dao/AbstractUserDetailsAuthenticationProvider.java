@@ -121,15 +121,20 @@ public abstract class AbstractUserDetailsAuthenticationProvider
 
 	@Override
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+		// 如果authentication不是UsernamePasswordAuthenticationToken类型，则抛出异常
 		Assert.isInstanceOf(UsernamePasswordAuthenticationToken.class, authentication,
 				() -> this.messages.getMessage("AbstractUserDetailsAuthenticationProvider.onlySupports",
 						"Only UsernamePasswordAuthenticationToken is supported"));
+		// 获取用户名
 		String username = determineUsername(authentication);
 		boolean cacheWasUsed = true;
+		// 从缓存中获取UserDetails
 		UserDetails user = this.userCache.getUserFromCache(username);
+		// 缓存中没有，则从子类DaoAuthenticationProvider中获取
 		if (user == null) {
 			cacheWasUsed = false;
 			try {
+				//获取用户信息。由子类DaoAuthenticationProvider实现
 				user = retrieveUser(username, (UsernamePasswordAuthenticationToken) authentication);
 			}
 			catch (UsernameNotFoundException ex) {
@@ -154,9 +159,12 @@ public abstract class AbstractUserDetailsAuthenticationProvider
 			// we're using latest data (i.e. not from the cache)
 			cacheWasUsed = false;
 			user = retrieveUser(username, (UsernamePasswordAuthenticationToken) authentication);
+			// 前检查。由DefaultPreAuthenticationChecks实现(主要判断当前用户是否锁定，过期，冻结User)
 			this.preAuthenticationChecks.check(user);
+			// 附加检查。由子类DaoAuthenticationProvider实现
 			additionalAuthenticationChecks(user, (UsernamePasswordAuthenticationToken) authentication);
 		}
+		// 后检查。由DefaultPostAuthenticationChecks实现(检测密码是否过期)
 		this.postAuthenticationChecks.check(user);
 		if (!cacheWasUsed) {
 			this.userCache.putUserInCache(user);
@@ -165,6 +173,7 @@ public abstract class AbstractUserDetailsAuthenticationProvider
 		if (this.forcePrincipalAsString) {
 			principalToReturn = user.getUsername();
 		}
+		// 将已通过验证的用户信息封装成 UsernamePasswordAuthenticationToken 对象并返回
 		return createSuccessAuthentication(principalToReturn, authentication, user);
 	}
 
@@ -193,6 +202,8 @@ public abstract class AbstractUserDetailsAuthenticationProvider
 		// so subsequent attempts are successful even with encoded passwords.
 		// Also ensure we return the original getDetails(), so that future
 		// authentication events after cache expiry contain the details
+		// 重新封装成UsernamePasswordAuthenticationToken。包含用户名、密码，以及对应的权限
+		// 该构造方法会给父类Authentication赋值: super.setAuthenticated(true)
 		UsernamePasswordAuthenticationToken result = UsernamePasswordAuthenticationToken.authenticated(principal,
 				authentication.getCredentials(), this.authoritiesMapper.mapAuthorities(user.getAuthorities()));
 		result.setDetails(authentication.getDetails());

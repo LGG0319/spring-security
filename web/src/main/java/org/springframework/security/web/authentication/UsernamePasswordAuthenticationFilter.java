@@ -44,6 +44,8 @@ import org.springframework.util.Assert;
  * @author Colin Sampaleanu
  * @author Luke Taylor
  * @since 3.0
+ * Spring Security提供的默认身份验证过滤器，用于处理基于表单的用户名密码身份验证请求。它监听POST请求的"/login"路径，
+ * 接收用户名和密码等凭证，并将其封装为一个 UsernamePasswordAuthenticationToken 对象，然后通过 AuthenticationManager 进行身份验证
  */
 public class UsernamePasswordAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
 
@@ -68,20 +70,24 @@ public class UsernamePasswordAuthenticationFilter extends AbstractAuthentication
 		super(DEFAULT_ANT_PATH_REQUEST_MATCHER, authenticationManager);
 	}
 
+	// 提供身份认证的具体实现
 	@Override
 	public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
 			throws AuthenticationException {
 		if (this.postOnly && !request.getMethod().equals("POST")) {
 			throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
 		}
+		// 获取表单中的用户名和密码
 		String username = obtainUsername(request);
 		username = (username != null) ? username.trim() : "";
 		String password = obtainPassword(request);
 		password = (password != null) ? password : "";
+		// 组装成username+password形式的token
 		UsernamePasswordAuthenticationToken authRequest = UsernamePasswordAuthenticationToken.unauthenticated(username,
 				password);
 		// Allow subclasses to set the "details" property
 		setDetails(request, authRequest);
+		// 交给内部的AuthenticationManager去认证，并返回认证信息
 		return this.getAuthenticationManager().authenticate(authRequest);
 	}
 

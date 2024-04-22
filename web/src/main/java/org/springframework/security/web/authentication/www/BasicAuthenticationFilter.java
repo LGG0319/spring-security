@@ -90,6 +90,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * remember-me mechanism.
  *
  * @author Ben Alex
+ * 用于处理HTTP基本身份验证请求。它从请求头中获取用户名和密码，
+ * 并将其封装为一个 UsernamePasswordAuthenticationToken 对象，然后通过 AuthenticationManager 进行身份验证
  */
 public class BasicAuthenticationFilter extends OncePerRequestFilter {
 

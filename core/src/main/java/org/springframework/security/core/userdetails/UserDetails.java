@@ -45,12 +45,14 @@ public interface UserDetails extends Serializable {
 	/**
 	 * Returns the authorities granted to the user. Cannot return <code>null</code>.
 	 * @return the authorities, sorted by natural key (never <code>null</code>)
+	 * 权限集合
 	 */
 	Collection<? extends GrantedAuthority> getAuthorities();
 
 	/**
 	 * Returns the password used to authenticate the user.
 	 * @return the password
+	 * 密码
 	 */
 	String getPassword();
 
@@ -58,6 +60,7 @@ public interface UserDetails extends Serializable {
 	 * Returns the username used to authenticate the user. Cannot return
 	 * <code>null</code>.
 	 * @return the username (never <code>null</code>)
+	 * 用户名
 	 */
 	String getUsername();
 
@@ -66,6 +69,7 @@ public interface UserDetails extends Serializable {
 	 * authenticated.
 	 * @return <code>true</code> if the user's account is valid (ie non-expired),
 	 * <code>false</code> if no longer valid (ie expired)
+	 * 用户名是否没有过期
 	 */
 	default boolean isAccountNonExpired() {
 		return true;
@@ -75,6 +79,7 @@ public interface UserDetails extends Serializable {
 	 * Indicates whether the user is locked or unlocked. A locked user cannot be
 	 * authenticated.
 	 * @return <code>true</code> if the user is not locked, <code>false</code> otherwise
+	 * 用户名是否没有锁定
 	 */
 	default boolean isAccountNonLocked() {
 		return true;
@@ -85,6 +90,7 @@ public interface UserDetails extends Serializable {
 	 * credentials prevent authentication.
 	 * @return <code>true</code> if the user's credentials are valid (ie non-expired),
 	 * <code>false</code> if no longer valid (ie expired)
+	 * 用户密码是否没有过期
 	 */
 	default boolean isCredentialsNonExpired() {
 		return true;
@@ -94,6 +100,7 @@ public interface UserDetails extends Serializable {
 	 * Indicates whether the user is enabled or disabled. A disabled user cannot be
 	 * authenticated.
 	 * @return <code>true</code> if the user is enabled, <code>false</code> otherwise
+	 * 账号是否可用(可理解为是否删除)
 	 */
 	default boolean isEnabled() {
 		return true;

@@ -65,6 +65,7 @@ import org.springframework.web.filter.GenericFilterBean;
  *
  * @author Ben Alex
  * @author Luke Taylor
+ * 用于处理Remember Me身份验证请求。当用户选择 记住我 选项时，该过滤器会从请求中获取 Remember Me 凭证，并验证 Remember Me 令牌的有效性
  */
 public class RememberMeAuthenticationFilter extends GenericFilterBean implements ApplicationEventPublisherAware {
 
