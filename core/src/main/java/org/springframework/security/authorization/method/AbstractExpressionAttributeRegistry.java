@@ -49,9 +49,12 @@ abstract class AbstractExpressionAttributeRegistry<T extends ExpressionAttribute
 	 * Returns an {@link ExpressionAttribute} for the {@link MethodInvocation}.
 	 * @param mi the {@link MethodInvocation} to use
 	 * @return the {@link ExpressionAttribute} to use
+	 * 获取请求方法的权限校验表达式
 	 */
 	final T getAttribute(MethodInvocation mi) {
+		// 获取当前方法
 		Method method = mi.getMethod();
+		// 获取当前对象
 		Object target = mi.getThis();
 		Class<?> targetClass = (target != null) ? target.getClass() : null;
 		return getAttribute(method, targetClass);

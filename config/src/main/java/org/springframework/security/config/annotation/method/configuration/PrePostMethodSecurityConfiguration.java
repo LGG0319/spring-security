@@ -61,6 +61,7 @@ import org.springframework.util.function.SingletonSupplier;
  * @author Josh Cummings
  * @since 5.6
  * @see EnableMethodSecurity
+ * PrePostMethodSecurityConfiguration
  */
 @Configuration(proxyBeanMethods = false)
 @Role(BeanDefinition.ROLE_INFRASTRUCTURE)

@@ -49,11 +49,14 @@ final class PreAuthorizeExpressionAttributeRegistry extends AbstractExpressionAt
 	@NonNull
 	@Override
 	ExpressionAttribute resolveAttribute(Method method, Class<?> targetClass) {
+		// 使用反射获取请求方法的注解   通过Aop工具类，
 		Method specificMethod = AopUtils.getMostSpecificMethod(method, targetClass);
+		// 获取权限注解方式中的权限码
 		PreAuthorize preAuthorize = findPreAuthorizeAnnotation(specificMethod, targetClass);
 		if (preAuthorize == null) {
 			return ExpressionAttribute.NULL_ATTRIBUTE;
 		}
+		// 将权限码封装为符合spring security规范的权限表达式
 		Expression expression = getExpressionHandler().getExpressionParser().parseExpression(preAuthorize.value());
 		MethodAuthorizationDeniedHandler handler = resolveHandler(method, targetClass);
 		return new PreAuthorizeExpressionAttribute(expression, handler);
@@ -73,6 +76,7 @@ final class PreAuthorizeExpressionAttributeRegistry extends AbstractExpressionAt
 		return this.defaultHandler;
 	}
 
+	// 获取权限注解方式中的权限码
 	private PreAuthorize findPreAuthorizeAnnotation(Method method, Class<?> targetClass) {
 		Function<AnnotatedElement, PreAuthorize> lookup = findUniqueAnnotation(PreAuthorize.class);
 		PreAuthorize preAuthorize = lookup.apply(method);

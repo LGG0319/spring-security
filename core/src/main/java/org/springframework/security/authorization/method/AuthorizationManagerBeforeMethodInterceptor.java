@@ -50,6 +50,7 @@ import org.springframework.util.Assert;
  * @author Evgeniy Cheban
  * @author Josh Cummings
  * @since 5.6
+ * 所有请求会进入该拦截器方法中，执行invoke方法，调用attemptAuthorization权限认证方法
  */
 public final class AuthorizationManagerBeforeMethodInterceptor implements AuthorizationAdvisor {
 
@@ -245,10 +246,12 @@ public final class AuthorizationManagerBeforeMethodInterceptor implements Author
 		this.securityContextHolderStrategy = () -> securityContextHolderStrategy;
 	}
 
+	// 完成用户的授权操作，如果没有授权成功，则直接抛出授权失败的异常，该方法使用了PreAuthorizeAuthorizationManager管理器完成用户的授权操作
 	private Object attemptAuthorization(MethodInvocation mi) throws Throwable {
 		this.logger.debug(LogMessage.of(() -> "Authorizing method invocation " + mi));
 		AuthorizationDecision decision;
 		try {
+			// 校验当前访问方法的权限
 			decision = this.authorizationManager.check(this::getAuthentication, mi);
 		}
 		catch (AuthorizationDeniedException denied) {

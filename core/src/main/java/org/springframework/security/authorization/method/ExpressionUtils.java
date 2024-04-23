@@ -27,13 +27,16 @@ final class ExpressionUtils {
 	private ExpressionUtils() {
 	}
 
+	// 权限校验
 	static AuthorizationResult evaluate(Expression expr, EvaluationContext ctx) {
 		try {
+			// 权限校验
 			Object result = expr.getValue(ctx);
 			if (result instanceof AuthorizationResult decision) {
 				return decision;
 			}
 			if (result instanceof Boolean granted) {
+				// 将授权的结果封装成ExpressionAttributeAuthorizationDecision对象返回
 				return new ExpressionAuthorizationDecision(granted, expr);
 			}
 			if (result == null) {

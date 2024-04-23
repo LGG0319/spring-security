@@ -34,6 +34,7 @@ import org.springframework.lang.NonNull;
  * @author Evgeniy Cheban
  * @author Josh Cummings
  * @since 5.6
+ * 导入了切面代理注册器和方法级别的权限配置类PrePostMethodSecurityConfiguration，用于方法级别的权限配置处理
  */
 final class MethodSecuritySelector implements ImportSelector {
 

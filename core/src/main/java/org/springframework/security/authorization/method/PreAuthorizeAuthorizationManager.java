@@ -77,11 +77,14 @@ public final class PreAuthorizeAuthorizationManager
 	 */
 	@Override
 	public AuthorizationDecision check(Supplier<Authentication> authentication, MethodInvocation mi) {
+		// 获取请求方法的权限校验表达式
 		ExpressionAttribute attribute = this.registry.getAttribute(mi);
 		if (attribute == ExpressionAttribute.NULL_ATTRIBUTE) {
 			return null;
 		}
+		// 完成用户的权限验证
 		EvaluationContext ctx = this.registry.getExpressionHandler().createEvaluationContext(authentication, mi);
+		// 检验权限
 		return (AuthorizationDecision) ExpressionUtils.evaluate(attribute.getExpression(), ctx);
 	}
 

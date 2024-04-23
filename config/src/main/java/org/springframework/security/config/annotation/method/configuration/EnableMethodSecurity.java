@@ -36,6 +36,7 @@ import org.springframework.security.access.prepost.PreFilter;
  * @author Evgeniy Cheban
  * @author Josh Cummings
  * @since 5.6
+ * 开启方法级别的权限验证
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
