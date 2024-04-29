@@ -237,6 +237,7 @@ public class FilterChainProxy extends GenericFilterBean {
 	 * Returns the first filter chain matching the supplied URL.
 	 * @param request the request to match
 	 * @return an ordered array of Filters defining the filter chain
+	 * 如果有多组SecurityFilterChain，匹配到1组即可返回执行，其他不予执行
 	 */
 	private List<Filter> getFilters(HttpServletRequest request) {
 		int count = 0;
