@@ -41,6 +41,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * @author Josh Cummings
  * @author Ankur Pathak
  * @since 3.2
+ * (4) 处理头信息加入响应中，默认程序启动就会加载
+ * 作用：为当前响应添加报头的过滤器实现。可以添加某些头，启用浏览器保护。像X-Frame-Options, X-XSS-Protection和X-Content-Type-Options
  */
 public class HeaderWriterFilter extends OncePerRequestFilter {
 
@@ -52,6 +54,7 @@ public class HeaderWriterFilter extends OncePerRequestFilter {
 
 	/**
 	 * Indicates whether to write the headers at the beginning of the request.
+	 * 默认是false 也就是在过滤器都执行完成后，回到该过滤器时向response中写入
 	 */
 	private boolean shouldWriteHeadersEagerly = false;
 
@@ -59,6 +62,7 @@ public class HeaderWriterFilter extends OncePerRequestFilter {
 	 * Creates a new instance.
 	 * @param headerWriters the {@link HeaderWriter} instances to write out headers to the
 	 * {@link HttpServletResponse}.
+	 * 构造方法，需要在构造该过滤器时就传入要写入ResponseHeader的头信息
 	 */
 	public HeaderWriterFilter(List<HeaderWriter> headerWriters) {
 		Assert.notEmpty(headerWriters, "headerWriters cannot be null or empty");
@@ -69,9 +73,12 @@ public class HeaderWriterFilter extends OncePerRequestFilter {
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
 		if (this.shouldWriteHeadersEagerly) {
+			// 如果是提前写入响应头，则是直接调用了writeHeaders 方法，并继续执行过滤器
 			doHeadersBefore(request, response, filterChain);
 		}
 		else {
+			// 默认走该方法
+			// 在过滤器执行完成后，再写入头信息
 			doHeadersAfter(request, response, filterChain);
 		}
 	}

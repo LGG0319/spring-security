@@ -50,6 +50,7 @@ import org.springframework.web.filter.GenericFilterBean;
  *
  * @author Ben Alex
  * @author Eddú Meléndez
+ * （6）处理注销登录，默认程序启动就会加载
  */
 public class LogoutFilter extends GenericFilterBean {
 
@@ -95,12 +96,15 @@ public class LogoutFilter extends GenericFilterBean {
 
 	private void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
+		// 获取认证信息
 		if (requiresLogout(request, response)) {
 			Authentication auth = this.securityContextHolderStrategy.getContext().getAuthentication();
 			if (this.logger.isDebugEnabled()) {
 				this.logger.debug(LogMessage.format("Logging out [%s]", auth));
 			}
+			// 调用登出方法
 			this.handler.logout(request, response, auth);
+			// 跳转到登出成功后指定的页面
 			this.logoutSuccessHandler.onLogoutSuccess(request, response, auth);
 			return;
 		}

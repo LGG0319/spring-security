@@ -57,6 +57,7 @@ import org.springframework.web.filter.CorsFilter;
  *
  * @author Rob Winch
  * @since 3.2
+ * Security Filter Bean注册
  */
 
 @SuppressWarnings("serial")
@@ -68,6 +69,7 @@ final class FilterOrderRegistration {
 
 	private final Map<String, Integer> filterToOrder = new HashMap<>();
 
+	// 默认情况下会被加载的过滤器
 	FilterOrderRegistration() {
 		Step order = new Step(INITIAL_ORDER, ORDER_STEP);
 		put(DisableEncodeUrlFilter.class, order.next());

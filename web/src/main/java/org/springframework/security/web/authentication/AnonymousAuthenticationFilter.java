@@ -47,6 +47,8 @@ import org.springframework.web.filter.GenericFilterBean;
  * @author Ben Alex
  * @author Luke Taylor
  * @author Evgeniy Cheban
+ * （13） 配置匿名认证，默认程序启动就会加载
+ * 作用：如果在经过该过滤器时，依然没有获取到用户的认证信息，则创建一个匿名用户
  */
 public class AnonymousAuthenticationFilter extends GenericFilterBean implements InitializingBean {
 
@@ -94,7 +96,10 @@ public class AnonymousAuthenticationFilter extends GenericFilterBean implements 
 	@Override
 	public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
 			throws IOException, ServletException {
+		// 从SecurityContextHolderStrategy中获取SecurityContext
 		Supplier<SecurityContext> deferredContext = this.securityContextHolderStrategy.getDeferredContext();
+		// 再给SecurityContextHolderStrategy从新设置一次SecurityContext
+		// 该方法根据请求和 从SecurityContextHolderStrategy中获取的SecurityContext 再次生产一个Supplier<SecurityContext>
 		this.securityContextHolderStrategy
 			.setDeferredContext(defaultWithAnonymous((HttpServletRequest) req, deferredContext));
 		chain.doFilter(req, res);
@@ -102,15 +107,18 @@ public class AnonymousAuthenticationFilter extends GenericFilterBean implements 
 
 	private Supplier<SecurityContext> defaultWithAnonymous(HttpServletRequest request,
 			Supplier<SecurityContext> currentDeferredContext) {
-		return SingletonSupplier.of(() -> {
-			SecurityContext currentContext = currentDeferredContext.get();
+		return SingletonSupplier.of(() -> {  // 获取SecurityContext
+			SecurityContext currentContext = currentDeferredContext.get();  // 创建一个默认的Anonymous SecurityContext
 			return defaultWithAnonymous(request, currentContext);
 		});
 	}
 
 	private SecurityContext defaultWithAnonymous(HttpServletRequest request, SecurityContext currentContext) {
+		// 从currentContext中获取 Authentication
 		Authentication currentAuthentication = currentContext.getAuthentication();
+		// 如果凭证信息为空
 		if (currentAuthentication == null) {
+			// 创建一个匿名的Authentication信息
 			Authentication anonymous = createAuthentication(request);
 			if (this.logger.isTraceEnabled()) {
 				this.logger.trace(LogMessage.of(() -> "Set SecurityContextHolder to " + anonymous));
@@ -118,7 +126,9 @@ public class AnonymousAuthenticationFilter extends GenericFilterBean implements 
 			else {
 				this.logger.debug("Set SecurityContextHolder to anonymous SecurityContext");
 			}
+			// 将anonymous Authentication 设置到SecurityContext 中
 			SecurityContext anonymousContext = this.securityContextHolderStrategy.createEmptyContext();
+			// 返回 匿名的 SecurityContext
 			anonymousContext.setAuthentication(anonymous);
 			return anonymousContext;
 		}
@@ -128,6 +138,7 @@ public class AnonymousAuthenticationFilter extends GenericFilterBean implements 
 						+ currentAuthentication));
 			}
 		}
+		// 如果不为空 直接返回原SecurityContext
 		return currentContext;
 	}
 

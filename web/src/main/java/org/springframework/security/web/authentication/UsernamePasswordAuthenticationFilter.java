@@ -46,6 +46,7 @@ import org.springframework.util.Assert;
  * @since 3.0
  * Spring Security提供的默认身份验证过滤器，用于处理基于表单的用户名密码身份验证请求。它监听POST请求的"/login"路径，
  * 接收用户名和密码等凭证，并将其封装为一个 UsernamePasswordAuthenticationToken 对象，然后通过 AuthenticationManager 进行身份验证
+ * （7） 处理表单登录，默认程序启动就会加载
  */
 public class UsernamePasswordAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
 

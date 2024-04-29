@@ -80,6 +80,11 @@ import org.springframework.web.filter.GenericFilterBean;
  *
  * @author Ben Alex
  * @author colin sampaleanu
+ * （14）处理认证/授权中的异常，默认程序启动就会加载
+ * 作用：作用是用来处理 过滤器链中抛出来的权限校验异常。
+ * 		如果检测到AuthenticationException这种认证异常，过滤器将启动authenticationEntryPoint 跳转到登录页面去认证。
+ * 		如果检测到AccessDeniedException，过滤器将确定用户是否是匿名用户。如果是匿名用户，authenticationEntryPoint将启动，跳转到登录页面去，
+ * 		如果他们不是匿名用户，过滤器将委托给AccessDeniedHandler。默认情况下，过滤器将使用AccessDeniedHandlerImpl
  */
 public class ExceptionTranslationFilter extends GenericFilterBean implements MessageSourceAware {
 

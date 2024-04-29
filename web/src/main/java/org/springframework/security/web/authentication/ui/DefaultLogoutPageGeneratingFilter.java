@@ -37,6 +37,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * @author Rob Winch
  * @since 5.1
+ * （9）配置默认注销页面，默认程序启动就会加载
+ * 作用：提供在默认配置下生成一个登出页面的能力
  */
 public class DefaultLogoutPageGeneratingFilter extends OncePerRequestFilter {
 
@@ -48,6 +50,7 @@ public class DefaultLogoutPageGeneratingFilter extends OncePerRequestFilter {
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
 		if (this.matcher.matches(request)) {
+			// 生成页面返回到浏览器
 			renderLogout(request, response);
 		}
 		else {

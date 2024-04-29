@@ -92,6 +92,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * @author Ben Alex
  * 用于处理HTTP基本身份验证请求。它从请求头中获取用户名和密码，
  * 并将其封装为一个 UsernamePasswordAuthenticationToken 对象，然后通过 AuthenticationManager 进行身份验证
+ * 用来做BASIC认证的。与表单认证的作用一样，都是一种用户认证的方式。（这种认证方式用的很少）
+ * （10）处理 HttpBasic登录，默认程序启动就会加载
  */
 public class BasicAuthenticationFilter extends OncePerRequestFilter {
 
@@ -176,6 +178,7 @@ public class BasicAuthenticationFilter extends OncePerRequestFilter {
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
 		try {
+			// 从Request中解析到 凭证信息
 			Authentication authRequest = this.authenticationConverter.convert(request);
 			if (authRequest == null) {
 				this.logger.trace("Did not process authentication request since failed to find "
@@ -183,9 +186,11 @@ public class BasicAuthenticationFilter extends OncePerRequestFilter {
 				chain.doFilter(request, response);
 				return;
 			}
+			// 获取到用户名
 			String username = authRequest.getName();
 			this.logger.trace(LogMessage.format("Found username '%s' in Basic Authorization header", username));
 			if (authenticationIsRequired(username)) {
+				// 调用认证接口
 				Authentication authResult = this.authenticationManager.authenticate(authRequest);
 				SecurityContext context = this.securityContextHolderStrategy.createEmptyContext();
 				context.setAuthentication(authResult);

@@ -59,6 +59,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * @author Rob Winch
  * @author Steve Riesenberg
  * @since 3.2
+ * (5) 处理CSRF(跨站)攻击，默认程序启动就会加载
  */
 public final class CsrfFilter extends OncePerRequestFilter {
 
@@ -106,9 +107,11 @@ public final class CsrfFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
+		// 在Request中设置CsrfToken
 		DeferredCsrfToken deferredCsrfToken = this.tokenRepository.loadDeferredToken(request, response);
 		request.setAttribute(DeferredCsrfToken.class.getName(), deferredCsrfToken);
 		this.requestHandler.handle(request, response, deferredCsrfToken::get);
+		// 默认忽略了("GET", "HEAD", "TRACE", "OPTIONS"） 这种不会改变数据 的请求方式
 		if (!this.requireCsrfProtectionMatcher.matches(request)) {
 			if (this.logger.isTraceEnabled()) {
 				this.logger.trace("Did not protect against CSRF since request did not match "
@@ -117,8 +120,11 @@ public final class CsrfFilter extends OncePerRequestFilter {
 			filterChain.doFilter(request, response);
 			return;
 		}
-		CsrfToken csrfToken = deferredCsrfToken.get();
+		// 获取CsrfToken ，有就返回 没有初始化一个token
+		CsrfToken csrfToken = deferredCsrfToken.get(); // 获取请求中携带的token
+		// 对比 token
 		String actualToken = this.requestHandler.resolveCsrfTokenValue(request, csrfToken);
+		// 是否是未携带token,未携带// 抛出异常
 		if (!equalsConstantTime(csrfToken.getToken(), actualToken)) {
 			boolean missingToken = deferredCsrfToken.isGenerated();
 			this.logger

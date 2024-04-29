@@ -44,11 +44,27 @@ import org.springframework.web.filter.GenericFilterBean;
  * @author Rob Winch
  * @author Marcus da Coregio
  * @since 5.7
+ * (3) 获取安全上下文，默认程序启动就会加载
+ * 该Filter是用于存储用户认证信息的，他有两个重要的属性 SecurityContextRepository 和 securityContextHolderStrategy 。
+ * 该过滤器最主要的作用是：
+ * 		1.如果请求上下文中存在 SecurityContext 则 SecurityContext存储到securityContextHolderStrategy默认是ThreadLocal
+		2.在整个过滤器链执行完成后清除SecurityContext
+ * 		3.存储到securityContextHolderStrategy可以保证后续的过滤器都可以从securityContextHolderStrategy中获取到SecurityContext。
  */
 public class SecurityContextHolderFilter extends GenericFilterBean {
 
 	private static final String FILTER_APPLIED = SecurityContextHolderFilter.class.getName() + ".APPLIED";
 
+	// SecurityContextRepository接口 提供一种在整个请求上下文存储SecurityContext的能力
+	// SecurityContextRepository接口有两个重要方法： loadContext - 获取SecurityContext loadDeferredContext-延期获取SecurityContext saveContext - 保存SecurityContext
+	// 该属性默认为 DelegatingSecurityContextRepository，DelegatingSecurityContextRepository也是实现SecurityContextRepository接口的一个代理类
+	// DelegatingSecurityContextRepository允许代理多个SecurityContextRepository来实现SecurityContext的存储
+	// DelegatingSecurityContextRepository对 loadContext 和 saveContext 实现
+	// 默认被代理的SecurityContextRepository为：HttpSessionSecurityContextRepository 和 RequestAttributeSecurityContextRepository
+	// 当调用 DelegatingSecurityContextRepository 时，他会遍历被代理的SecurityContextRepository
+	// saveContext时：遍历被代理的SecurityContextRepository 都调用saveContext SecurityContext进行存储
+	// loadContext时: 调用自身loadDeferredContext 获取SecurityContext
+	// loadDeferredContext时：遍历被代理的SecurityContextRepository 调用loadDeferredContext 获取 SecurityContext
 	private final SecurityContextRepository securityContextRepository;
 
 	private SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
@@ -75,13 +91,18 @@ public class SecurityContextHolderFilter extends GenericFilterBean {
 			chain.doFilter(request, response);
 			return;
 		}
+		// 标记改过滤器在本次请求过程中已经执行过
 		request.setAttribute(FILTER_APPLIED, Boolean.TRUE);
+		// 从SecurityContextRepository获取到SecurityContext
 		Supplier<SecurityContext> deferredContext = this.securityContextRepository.loadDeferredContext(request);
 		try {
+			// 将SecurityContext存储到securityContextHolderStrategy中，也就是存储到线程中。
 			this.securityContextHolderStrategy.setDeferredContext(deferredContext);
 			chain.doFilter(request, response);
 		}
 		finally {
+			// 这时应该 后续所有的Filter都已执行完后，有回到当前Filter中
+			// 请求执行完成后，清除SecurityContext
 			this.securityContextHolderStrategy.clearContext();
 			request.removeAttribute(FILTER_APPLIED);
 		}

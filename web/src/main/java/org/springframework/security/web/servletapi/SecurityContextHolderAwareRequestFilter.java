@@ -68,6 +68,11 @@ import org.springframework.web.filter.GenericFilterBean;
  * @author Luke Taylor
  * @author Rob Winch
  * @author Eddú Meléndez
+ * （12）包装原始请求，默认程序启动就会加载
+ * 作用：将ServletRequest包装成 SecurityContextHolderAwareRequestWrapper,
+ * 		SecurityContextHolderAwareRequestWrapper 包装了SpringContext定义的 Authentication 对象。
+ * 		SecurityContextHolderAwareRequestWrapper 包含 securityContextHolderStrategy属性，
+ * 		所以从SecurityContextHolderAwareRequestWrapper中可以直接获取到SecurityContext。
  */
 public class SecurityContextHolderAwareRequestFilter extends GenericFilterBean {
 

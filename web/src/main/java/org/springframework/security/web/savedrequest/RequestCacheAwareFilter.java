@@ -41,6 +41,9 @@ import org.springframework.web.filter.GenericFilterBean;
  *
  * @author Luke Taylor
  * @since 3.0
+ * （11）处理请求缓存，默认程序启动就会加载
+ * 作用：当客户端访问资源时，RequestCacheAwareFilter尝试冲缓存中查找已经保存的Request，
+ * 		默认是存储到Session的Attitude种的，默认的key为SPRING_SECURITY_SAVED_REQUEST。
  */
 public class RequestCacheAwareFilter extends GenericFilterBean {
 
@@ -58,6 +61,7 @@ public class RequestCacheAwareFilter extends GenericFilterBean {
 	@Override
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
+		// 尝试从缓存中获取已缓存的请求，如果有缓存的请求，则用缓存的请求继续执行，否则用本次请求继续执行
 		HttpServletRequest wrappedSavedRequest = this.requestCache.getMatchingRequest((HttpServletRequest) request,
 				(HttpServletResponse) response);
 		chain.doFilter((wrappedSavedRequest != null) ? wrappedSavedRequest : request, response);

@@ -30,7 +30,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Disables encoding URLs using the {@link HttpServletResponse} to prevent including the
  * session id in URLs which is not considered URL because the session id can be leaked in
  * things like HTTP access logs.
- *
+ * （1）禁用使用 HttpServletResponse 对URL进行编码，以防止将会话id包括在不被视为URL的URL中，因为会话id可能会在HTTP访问日志中泄露
+ * 原因：Session的会话持有在客户端是通过cookies来保存SessionId来实现的，每次客户端的请求都携带sessionId.
+ * 		如果禁用了cookie，后端的默认响应会重写url将sessionId拼接到url后面，传递给页面，sessionId就在http访问日志中暴露了
  * @author Rob Winch
  * @since 5.7
  */
@@ -39,6 +41,7 @@ public class DisableEncodeUrlFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
+		// 对response进行包装后直接放行
 		filterChain.doFilter(request, new DisableEncodeUrlResponseWrapper(response));
 	}
 

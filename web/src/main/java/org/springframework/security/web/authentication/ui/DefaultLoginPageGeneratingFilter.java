@@ -48,6 +48,8 @@ import org.springframework.web.util.HtmlUtils;
  *
  * @author Luke Taylor
  * @since 2.0
+ * （8） 配置默认登录页面，默认程序启动就会加载
+ * 作用：提供在默认配置下生成一个登录页面的能力
  */
 public class DefaultLoginPageGeneratingFilter extends GenericFilterBean {
 
@@ -177,12 +179,16 @@ public class DefaultLoginPageGeneratingFilter extends GenericFilterBean {
 
 	private void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
+		// 判断是不是退出登录成功跳转页面
 		boolean loginError = isErrorPage(request);
+		// 判断是否需要需要生成登录页面
 		boolean logoutSuccess = isLogoutSuccess(request);
 		if (isLoginUrlRequest(request) || loginError || logoutSuccess) {
+			// 生产页面HTML代码
 			String loginPageHtml = generateLoginPageHtml(request, loginError, logoutSuccess);
 			response.setContentType("text/html;charset=UTF-8");
 			response.setContentLength(loginPageHtml.getBytes(StandardCharsets.UTF_8).length);
+			// 将登陆页面写入response，返回到浏览器
 			response.getWriter().write(loginPageHtml);
 			return;
 		}

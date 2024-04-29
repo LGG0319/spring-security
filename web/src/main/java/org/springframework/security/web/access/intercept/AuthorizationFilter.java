@@ -47,6 +47,9 @@ import org.springframework.web.filter.GenericFilterBean;
  *
  * @author Evgeniy Cheban
  * @since 5.5
+ * （15） 处理当前用户是否有权限访问目标资源，默认程序启动就会加载
+ * 作用：判断当前的用户用没有权限可以访问目标资源。
+ * 		如果用户没有权限访问当前资源 会抛出 AccessDeniedException。异常会被ExceptionTranslationFilter处理。
  */
 public class AuthorizationFilter extends GenericFilterBean {
 
@@ -78,28 +81,39 @@ public class AuthorizationFilter extends GenericFilterBean {
 
 		HttpServletRequest request = (HttpServletRequest) servletRequest;
 		HttpServletResponse response = (HttpServletResponse) servletResponse;
-
+		// 判断是否 监控每一次请求 并且 当前请求已经执行过该过滤器 则跳过认证
 		if (this.observeOncePerRequest && isApplied(request)) {
 			chain.doFilter(request, response);
 			return;
 		}
-
+		// 当请求的转发方式 为ERROR 和 ASYNC时 跳过认证
+		// DispatcherType.ERROR  当容器将处理过程传递给错误处理机制(如定义的错误页)时。
+		// DispatcherType.ASYNC  在以下几种情况下 AsyncContext.dispatch(), AsyncContext.dispatch(String) and AsyncContext.addListener(AsyncListener, ServletRequest, ServletResponse)
 		if (skipDispatch(request)) {
 			chain.doFilter(request, response);
 			return;
 		}
-
+		// 获取记录已经执行过该过滤器的标记setAttribute KEY
 		String alreadyFilteredAttributeName = getAlreadyFilteredAttributeName();
+		// 设置为TRUE 表示已经执行了该过滤器
 		request.setAttribute(alreadyFilteredAttributeName, Boolean.TRUE);
 		try {
+			// 调用authorizationManager 判断当前用户是否有权限访问该资源
+			// this::getAuthentication -> 获取用户的认证信息
+			// request： 当前请求
+			// AuthorizationDecision: 授权描述  decision.isGranted() 表示是否有该资源的权限
 			AuthorizationDecision decision = this.authorizationManager.check(this::getAuthentication, request);
+			// 发布一个认证的消息
 			this.eventPublisher.publishAuthorizationEvent(this::getAuthentication, request, decision);
+			// 如果未授权，抛出异常AccessDeniedException
 			if (decision != null && !decision.isGranted()) {
 				throw new AccessDeniedException("Access Denied");
 			}
+			// 已授权 继续向后执行
 			chain.doFilter(request, response);
 		}
 		finally {
+			// 请求执行完成后 移除掉 已执行标记
 			request.removeAttribute(alreadyFilteredAttributeName);
 		}
 	}
