@@ -53,6 +53,7 @@ import org.springframework.util.Assert;
  *
  * @author Rob Winch
  * @since 3.2
+ * 该策略包含了一系列代理策略（delegateStrategies），逻辑为遍历执行所有的代理策咯
  */
 public class CompositeSessionAuthenticationStrategy implements SessionAuthenticationStrategy {
 

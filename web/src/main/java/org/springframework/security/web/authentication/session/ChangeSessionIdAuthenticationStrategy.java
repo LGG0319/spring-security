@@ -28,6 +28,7 @@ import jakarta.servlet.http.HttpSession;
  */
 public final class ChangeSessionIdAuthenticationStrategy extends AbstractSessionFixationProtectionStrategy {
 
+	// 不去创建新的session，仅仅是修改下session id而已
 	@Override
 	HttpSession applySessionFixation(HttpServletRequest request) {
 		request.changeSessionId();

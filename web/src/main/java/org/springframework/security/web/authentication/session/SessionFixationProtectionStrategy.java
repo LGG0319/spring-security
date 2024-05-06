@@ -82,19 +82,29 @@ public class SessionFixationProtectionStrategy extends AbstractSessionFixationPr
 
 	@Override
 	final HttpSession applySessionFixation(HttpServletRequest request) {
+		// 获取session
 		HttpSession session = request.getSession();
+		// 获取原来的session id
 		String originalSessionId = session.getId();
 		this.logger.debug(LogMessage.of(() -> "Invalidating session with Id '" + originalSessionId + "' "
 				+ (this.migrateSessionAttributes ? "and" : "without") + " migrating attributes."));
+		// 获取原来session中的所有属性
 		Map<String, Object> attributesToMigrate = extractAttributes(session);
+		// 获取session的超时时间
 		int maxInactiveIntervalToMigrate = session.getMaxInactiveInterval();
+		// 将原来的session失效
 		session.invalidate();
+		// 创建一个新的session
 		session = request.getSession(true); // we now have a new session
 		this.logger.debug(LogMessage.format("Started new session: %s", session.getId()));
+		// 将原先session的所有属性迁移到新的session上
 		transferAttributes(attributesToMigrate, session);
+		// 如果需要迁移session自身的属性
 		if (this.migrateSessionAttributes) {
+			// 设置新session的超时时间和旧session一致
 			session.setMaxInactiveInterval(maxInactiveIntervalToMigrate);
 		}
+		// 返回处理过的session
 		return session;
 	}
 

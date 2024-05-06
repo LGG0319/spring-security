@@ -34,6 +34,7 @@ import org.springframework.util.Assert;
  * @author Rob Winch
  * @author Steve Riesenberg
  * @since 3.2
+ * 用于在认证成功之后，更换一个新的csrf token
  */
 public final class CsrfAuthenticationStrategy implements SessionAuthenticationStrategy {
 
@@ -65,8 +66,10 @@ public final class CsrfAuthenticationStrategy implements SessionAuthenticationSt
 	@Override
 	public void onAuthentication(Authentication authentication, HttpServletRequest request,
 			HttpServletResponse response) throws SessionAuthenticationException {
+		// 检测是否存在csrf token
 		boolean containsToken = this.tokenRepository.loadToken(request) != null;
 		if (containsToken) {
+			// 清空原来的csrf token
 			this.tokenRepository.saveToken(null, request, response);
 			DeferredCsrfToken deferredCsrfToken = this.tokenRepository.loadDeferredToken(request, response);
 			this.requestHandler.handle(request, response, deferredCsrfToken::get);

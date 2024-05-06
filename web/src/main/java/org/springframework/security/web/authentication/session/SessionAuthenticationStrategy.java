@@ -30,6 +30,8 @@ import org.springframework.security.core.Authentication;
  *
  * @author Luke Taylor
  * @since
+ * 用于在非匿名身份认证时，可以自定义策略去对HttpSession进行相关操作。
+ * 典型用途是确保会话存在或更改会话 ID 以防止会话固定攻击
  */
 public interface SessionAuthenticationStrategy {
 
@@ -38,6 +40,7 @@ public interface SessionAuthenticationStrategy {
 	 * @throws SessionAuthenticationException if it is decided that the authentication is
 	 * not allowed for the session. This will typically be because the user has too many
 	 * sessions open at once.
+	 * 当发生新的身份验证时，执行与Http会话相关的功能
 	 */
 	void onAuthentication(Authentication authentication, HttpServletRequest request, HttpServletResponse response)
 			throws SessionAuthenticationException;

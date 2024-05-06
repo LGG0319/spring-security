@@ -66,6 +66,7 @@ import org.springframework.util.Assert;
  * @author Rob Winch
  * @since 3.2
  * @see CompositeSessionAuthenticationStrategy
+ * 该策略用于限制用户并发session数量，可用于限制同一用户可同事存在的会话数
  */
 public class ConcurrentSessionControlAuthenticationStrategy
 		implements MessageSourceAware, SessionAuthenticationStrategy {
@@ -94,22 +95,29 @@ public class ConcurrentSessionControlAuthenticationStrategy
 	@Override
 	public void onAuthentication(Authentication authentication, HttpServletRequest request,
 			HttpServletResponse response) {
+		// 获取最大允许的session数
 		int allowedSessions = getMaximumSessionsForThisUser(authentication);
+		// 如果值为-1，说明没有session数量限制
 		if (allowedSessions == -1) {
 			// We permit unlimited logins
 			return;
 		}
+		// 获取当前用户的所有session，不包含失效的session
 		List<SessionInformation> sessions = this.sessionRegistry.getAllSessions(authentication.getPrincipal(), false);
 		int sessionCount = sessions.size();
+		// 如果当前用户session数小于最大允许的session数，无需处理
 		if (sessionCount < allowedSessions) {
 			// They haven't got too many login sessions running at present
 			return;
 		}
+		// 如果数量相同
 		if (sessionCount == allowedSessions) {
 			HttpSession session = request.getSession(false);
 			if (session != null) {
 				// Only permit it though if this request is associated with one of the
 				// already registered sessions
+				// 挨个遍历现有的session
+				// 如果有一个session的id和当前session的id相同，这种情况是允许的，无需处理
 				for (SessionInformation si : sessions) {
 					if (si.getSessionId().equals(session.getId())) {
 						return;
@@ -119,6 +127,7 @@ public class ConcurrentSessionControlAuthenticationStrategy
 			// If the session is null, a new one will be created by the parent class,
 			// exceeding the allowed number
 		}
+		// 让超过最大允许数量的session失效
 		allowableSessionsExceeded(sessions, allowedSessions, this.sessionRegistry);
 	}
 
@@ -144,15 +153,20 @@ public class ConcurrentSessionControlAuthenticationStrategy
 	 */
 	protected void allowableSessionsExceeded(List<SessionInformation> sessions, int allowableSessions,
 			SessionRegistry registry) throws SessionAuthenticationException {
+		// 如果需要session数超过最大允许session数时抛出异常，则抛出异常
 		if (this.exceptionIfMaximumExceeded || (sessions == null)) {
 			throw new SessionAuthenticationException(
 					this.messages.getMessage("ConcurrentSessionControlAuthenticationStrategy.exceededAllowed",
 							new Object[] { allowableSessions }, "Maximum sessions of {0} for this principal exceeded"));
 		}
 		// Determine least recently used sessions, and mark them for invalidation
+		// 按照session的最后访问时间排序
 		sessions.sort(Comparator.comparing(SessionInformation::getLastRequest));
+		// 计算超时的session个数
 		int maximumSessionsExceededBy = sessions.size() - allowableSessions + 1;
+		// 截取已经超时的session信息
 		List<SessionInformation> sessionsToBeExpired = sessions.subList(0, maximumSessionsExceededBy);
+		// 将这些session设置为失效
 		for (SessionInformation session : sessionsToBeExpired) {
 			session.expireNow();
 		}

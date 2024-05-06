@@ -72,23 +72,35 @@ public abstract class AbstractSessionFixationProtectionStrategy
 	@Override
 	public void onAuthentication(Authentication authentication, HttpServletRequest request,
 			HttpServletResponse response) {
+		// 是否已经有session
 		boolean hadSessionAlready = request.getSession(false) != null;
+		// 如果没有session，并且不用总是创建session，直接返回，不需要防御session fixation
 		if (!hadSessionAlready && !this.alwaysCreateSession) {
 			// Session fixation isn't a problem if there's no session
 			return;
 		}
+		// 获取session
 		// Create new session if necessary
 		HttpSession session = request.getSession();
+		// 如果已经有session，并且session有效
 		if (hadSessionAlready && request.isRequestedSessionIdValid()) {
+			// 原来的session id
 			String originalSessionId;
+			// 新的session id
 			String newSessionId;
+			// 获取session对应的互斥锁synchonized object
 			Object mutex = WebUtils.getSessionMutex(session);
 			synchronized (mutex) {
 				// We need to migrate to a new session
+				// 保存原来的session id
 				originalSessionId = session.getId();
+				// 调用子类的applySessionFixation方法，执行攻击防御逻辑
+				// 这里返回一个session
 				session = applySessionFixation(request);
+				// 获取新的session id
 				newSessionId = session.getId();
 			}
+			// 如果新的session和老的还是相同，打印告警信息
 			if (originalSessionId.equals(newSessionId)) {
 				this.logger.warn("Your servlet container did not change the session ID when a new session "
 						+ "was created. You will not be adequately protected against session-fixation attacks");
@@ -98,6 +110,7 @@ public abstract class AbstractSessionFixationProtectionStrategy
 					this.logger.debug(LogMessage.format("Changed session id from %s", originalSessionId));
 				}
 			}
+			// 发布SessionFixationProtectionEvent这个事件
 			onSessionChange(originalSessionId, session, authentication);
 		}
 	}
