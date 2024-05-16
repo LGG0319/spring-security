@@ -34,6 +34,7 @@ import org.springframework.util.Assert;
  * {@link SecurityConfigurerAdapter}
  * @author Rob Winch
  * @author Wallace Wadge
+ * SecurityConfigurer 的适配器类，它允许子类只实现他们感兴趣的方法。同时它的 and()方法也提供了一种获得对正在配置的 SecurityBuilder 的引用的机制。
  */
 public abstract class SecurityConfigurerAdapter<O, B extends SecurityBuilder<O>> implements SecurityConfigurer<O, B> {
 
@@ -54,6 +55,7 @@ public abstract class SecurityConfigurerAdapter<O, B extends SecurityBuilder<O>>
 	 * This is useful for method chaining.
 	 * @return the {@link SecurityBuilder} for further customizations
 	 * @deprecated For removal in 7.0. Use the lambda based configuration instead.
+	 * 使用完 SecurityConfigurer 之后获取 SecurityBuilder 引用。这在链式调用方法时非常有用
 	 */
 	@Deprecated(since = "6.1", forRemoval = true)
 	public B and() {
@@ -64,6 +66,7 @@ public abstract class SecurityConfigurerAdapter<O, B extends SecurityBuilder<O>>
 	 * Gets the {@link SecurityBuilder}. Cannot be null.
 	 * @return the {@link SecurityBuilder}
 	 * @throws IllegalStateException if {@link SecurityBuilder} is null
+	 * 获取 SecurityBuilder 对象引用。不能为 null。
 	 */
 	protected final B getBuilder() {
 		Assert.state(this.securityBuilder != null, "securityBuilder cannot be null");
@@ -75,6 +78,7 @@ public abstract class SecurityConfigurerAdapter<O, B extends SecurityBuilder<O>>
 	 * {@link ObjectPostProcessor}.
 	 * @param object the Object to post process
 	 * @return the possibly modified Object to use
+	 * 执行对象的后置处理。默认是代理给 objectPostProcessor 对象
 	 */
 	@SuppressWarnings("unchecked")
 	protected <T> T postProcess(T object) {
@@ -86,6 +90,7 @@ public abstract class SecurityConfigurerAdapter<O, B extends SecurityBuilder<O>>
 	 * {@link SecurityConfigurerAdapter}. The default implementation does nothing to the
 	 * object.
 	 * @param objectPostProcessor the {@link ObjectPostProcessor} to use
+	 * 添加此对象（SecurityConfigurerAdapter）的一个后置处理器 ObjectPostProcessor 对象。默认不做任何事情
 	 */
 	public void addObjectPostProcessor(ObjectPostProcessor<?> objectPostProcessor) {
 		this.objectPostProcessor.addObjectPostProcessor(objectPostProcessor);
@@ -95,6 +100,7 @@ public abstract class SecurityConfigurerAdapter<O, B extends SecurityBuilder<O>>
 	 * Sets the {@link SecurityBuilder} to be used. This is automatically set when using
 	 * {@link AbstractConfiguredSecurityBuilder#apply(SecurityConfigurerAdapter)}
 	 * @param builder the {@link SecurityBuilder} to set
+	 * 给对象装配将要使用的 SecurityBuilder。这个过程是在调用 AbstractConfiguredSecurityBuilder#apply(SecurityConfigurerAdapter) 方法时自动执行。
 	 */
 	public void setBuilder(B builder) {
 		this.securityBuilder = builder;
@@ -105,6 +111,7 @@ public abstract class SecurityConfigurerAdapter<O, B extends SecurityBuilder<O>>
 	 * {@link ObjectPostProcessor} implementations.
 	 *
 	 * @author Rob Winch
+	 * 一个代理多个 ObjectPostProcessor 实现对象的 ObjectPostProcessor 代理类
 	 */
 	private static final class CompositeObjectPostProcessor implements ObjectPostProcessor<Object> {
 
@@ -127,6 +134,7 @@ public abstract class SecurityConfigurerAdapter<O, B extends SecurityBuilder<O>>
 		 * Adds an {@link ObjectPostProcessor} to use
 		 * @param objectPostProcessor the {@link ObjectPostProcessor} to add
 		 * @return true if the {@link ObjectPostProcessor} was added, else false
+		 * 添加一个 ObjectPostProcessor 的实现类对象
 		 */
 		private boolean addObjectPostProcessor(ObjectPostProcessor<?> objectPostProcessor) {
 			boolean result = this.postProcessors.add(objectPostProcessor);

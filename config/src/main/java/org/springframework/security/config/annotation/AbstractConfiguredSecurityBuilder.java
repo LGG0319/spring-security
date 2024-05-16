@@ -109,6 +109,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * determine if {@link #build()} needs to be called first.
 	 * @return the result of {@link #build()} or {@link #getObject()}. If an error occurs
 	 * while building, returns null.
+	 * 类似于 build() 和 getObject 方法，但是会检查状态看是否需要先执行 build() 方法。
 	 */
 	public O getOrBuild() {
 		if (!isUnbuilt()) {
@@ -176,6 +177,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * Sets an object that is shared by multiple {@link SecurityConfigurer}.
 	 * @param sharedType the Class to key the shared object by.
 	 * @param object the Object to store
+	 * 设置一个在多个 SecurityConfigurer 对象间共享的对象。
 	 */
 	@SuppressWarnings("unchecked")
 	public <C> void setSharedObject(Class<C> sharedType, C object) {
@@ -186,6 +188,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * Gets a shared Object. Note that object heirarchies are not considered.
 	 * @param sharedType the type of the shared Object
 	 * @return the shared Object or null if it is not found
+	 * 获取被共享的对象。请注意：不考虑类继承层次
 	 */
 	@SuppressWarnings("unchecked")
 	public <C> C getSharedObject(Class<C> sharedType) {
@@ -233,6 +236,8 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * List if not found. Note that object hierarchies are not considered.
 	 * @param clazz the {@link SecurityConfigurer} class to look for
 	 * @return a list of {@link SecurityConfigurer}s for further customization
+	 * 根据给定 Class 对象 获取所有的 SecurityConfigurer 对象集合，如果找不到则返回一个空集合
+	 * 请注意：不考虑类继承层次结构。
 	 */
 	@SuppressWarnings("unchecked")
 	public <C extends SecurityConfigurer<O, B>> List<C> getConfigurers(Class<C> clazz) {
@@ -248,6 +253,8 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * List if not found. Note that object hierarchies are not considered.
 	 * @param clazz the {@link SecurityConfigurer} class to look for
 	 * @return a list of {@link SecurityConfigurer}s for further customization
+	 * 移除并返回所有指定 class 对象关联的 SecurityConfigurer 对象集合 如果没有找到，则返回空。
+	 * 请注意：不考虑类继承层次结构。
 	 */
 	@SuppressWarnings("unchecked")
 	public <C extends SecurityConfigurer<O, B>> List<C> removeConfigurers(Class<C> clazz) {
@@ -264,6 +271,8 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * found. Note that object hierarchies are not considered.
 	 * @param clazz
 	 * @return the {@link SecurityConfigurer} for further customizations
+	 * 根据给定 Class 对象 获取 SecurityConfigurer 对象，如果找不到则返回 null
+	 * 请注意：不考虑类继承层次结构。
 	 */
 	@SuppressWarnings("unchecked")
 	public <C extends SecurityConfigurer<O, B>> C getConfigurer(Class<C> clazz) {
@@ -281,6 +290,8 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * <code>null</code> if not found. Note that object hierarchies are not considered.
 	 * @param clazz
 	 * @return
+	 * 移除并返回所有指定 class 对象关联的 SecurityConfigurer 对象，如果没有找到，则返回 null。
+	 * 请注意：不考虑类继承层次结构。
 	 */
 	@SuppressWarnings("unchecked")
 	public <C extends SecurityConfigurer<O, B>> C removeConfigurer(Class<C> clazz) {
@@ -302,6 +313,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * Specifies the {@link ObjectPostProcessor} to use.
 	 * @param objectPostProcessor the {@link ObjectPostProcessor} to use. Cannot be null
 	 * @return the {@link SecurityBuilder} for further customizations
+	 * 指定要使用的 ObjectPostProcessor。
 	 */
 	@SuppressWarnings("unchecked")
 	public B objectPostProcessor(ObjectPostProcessor<Object> objectPostProcessor) {
@@ -315,6 +327,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * {@link ObjectPostProcessor}.
 	 * @param object the Object to post process
 	 * @return the possibly modified Object to use
+	 * 执行对象的后置处理。默认是代理给 ObjectPostProcessor 去处理
 	 */
 	protected <P> P postProcess(P object) {
 		return this.objectPostProcessor.postProcess(object);
@@ -331,7 +344,11 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * <li>Invokes {@link #beforeConfigure()} for any subclass to hook into</li>
 	 * <li>Invokes {@link #performBuild()} which actually builds the Object</li>
 	 * </ul>
-	 * 构建 Security filterChain
+	 * 使用以下步骤应用 SecurityConfigurer 并执行构建：
+	 * 		调用预留给所有子类的 beforeInit() 钩子方法
+	 * 		调用所有应用在此 builder 上的 SecurityConfigurer 的 SecurityConfigurer#init(SecurityBuilder) 方法
+	 *		调用预留给所有子类的 beforeConfigure() 钩子方法
+	 * 		调用 performBuild() 方法执行实际的构建行为
 	 */
 	@Override
 	protected final O doBuild() throws Exception {
@@ -354,6 +371,8 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * Invoked prior to invoking each {@link SecurityConfigurer#init(SecurityBuilder)}
 	 * method. Subclasses may override this method to hook into the lifecycle without
 	 * using a {@link SecurityConfigurer}.
+	 * 在调用每个 SecurityConfigurer#init(SecurityBuilder) 方法之前调用此方法，
+	 * 子类可以重写此方法以在不使用 SecurityConfigurer 的情况下挂钩到生命周期。
 	 */
 	protected void beforeInit() throws Exception {
 	}
@@ -363,6 +382,8 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	 * {@link SecurityConfigurer#configure(SecurityBuilder)} method. Subclasses may
 	 * override this method to hook into the lifecycle without using a
 	 * {@link SecurityConfigurer}.
+	 * 在调用每个 SecurityConfigurer#configure(SecurityBuilder) 方法之前调用此方法，
+	 * 子类可以重写此方法以在不使用 SecurityConfigurer 的情况下挂钩到生命周期。
 	 */
 	protected void beforeConfigure() throws Exception {
 	}
@@ -370,7 +391,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	/**
 	 * Subclasses must implement this method to build the object that is being returned.
 	 * @return the Object to be buit or null if the implementation allows it
-	 * 要求子类必须提供实现的构建过程方法
+	 * 子类必须重写此方法，来执行真正的构建过程。
 	 */
 	protected abstract O performBuild() throws Exception;
 
@@ -406,6 +427,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 	/**
 	 * Determines if the object is unbuilt.
 	 * @return true, if unbuilt else false
+	 * 确定对象是否还没有被构建。
 	 */
 	private boolean isUnbuilt() {
 		synchronized (this.configurers) {
@@ -424,12 +446,14 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 
 		/**
 		 * This is the state before the {@link Builder#build()} is invoked
+		 * 在 SecurityBuilder#build() 未执行之前的状态
 		 */
 		UNBUILT(0),
 
 		/**
 		 * The state from when {@link Builder#build()} is first invoked until all the
 		 * {@link SecurityConfigurer#init(SecurityBuilder)} methods have been invoked.
+		 * 在 SecurityBuilder#build() 第一次执行之后并且所有的 SecurityConfigurer#init(SecurityBuilder)方法被调用完成之前的状态。
 		 */
 		INITIALIZING(1),
 
@@ -438,6 +462,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 		 * been invoked until after all the
 		 * {@link SecurityConfigurer#configure(SecurityBuilder)} methods have been
 		 * invoked.
+		 * 在所有的 SecurityConfigurer#init(SecurityBuilder) 被调用完成后，并且所有SecurityConfigurer#configure(SecurityBuilder) 被调用完成之前的状态。
 		 */
 		CONFIGURING(2),
 
@@ -445,11 +470,13 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 		 * From the point after all the
 		 * {@link SecurityConfigurer#configure(SecurityBuilder)} have completed to just
 		 * after {@link AbstractConfiguredSecurityBuilder#performBuild()}.
+		 * 在所有的 SecurityConfigurer#configure(SecurityBuilder) 被调用完成后，并且AbstractConfiguredSecurityBuilder#performBuild() 调用完成之前的状态。
 		 */
 		BUILDING(3),
 
 		/**
 		 * After the object has been completely built.
+		 * 对象被构造完成之后的状态
 		 */
 		BUILT(4);
 
@@ -466,6 +493,7 @@ public abstract class AbstractConfiguredSecurityBuilder<O, B extends SecurityBui
 		/**
 		 * Determines if the state is CONFIGURING or later
 		 * @return
+		 *  确定当前状态是否在 CONFIGURING 或者 之后的状态
 		 */
 		public boolean isConfigured() {
 			return this.order >= CONFIGURING.order;

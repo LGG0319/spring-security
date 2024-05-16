@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * @param <O> the type of Object that is being built
  * @author Rob Winch
- *
+ * SecurityBuilder 的基础实现类：职责为保证对象只被构建一次，并扩展一个获取构建后对象的方法
  */
 public abstract class AbstractSecurityBuilder<O> implements SecurityBuilder<O> {
 
@@ -46,6 +46,7 @@ public abstract class AbstractSecurityBuilder<O> implements SecurityBuilder<O> {
 	 * Gets the object that was built. If it has not been built yet an Exception is
 	 * thrown.
 	 * @return the Object that was built
+	 * 获取构建后的对象。如果还没有被构建，则抛出异常
 	 */
 	public final O getObject() {
 		if (!this.building.get()) {

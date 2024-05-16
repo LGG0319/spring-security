@@ -28,6 +28,7 @@ import org.springframework.beans.factory.InitializingBean;
  * @param <T> the bound of the types of Objects this {@link ObjectPostProcessor} supports.
  * @author Rob Winch
  * @since 3.2
+ * 允许初始化对象。通常用来调用 Aware methods、InitializingBean#afterPropertiesSet()。并且保证 DisposableBean#destroy() 被调用。
  */
 public interface ObjectPostProcessor<T> {
 
@@ -36,6 +37,7 @@ public interface ObjectPostProcessor<T> {
 	 * instead.
 	 * @param object the object to initialize
 	 * @return the initialized version of the object
+	 * 初始化对象，可能返回一个需要被使用的修改后的新对象
 	 */
 	<O extends T> O postProcess(O object);
 
