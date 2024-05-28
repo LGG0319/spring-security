@@ -30,7 +30,7 @@ updates:
           - version-update:semver-major
           - version-update:semver-minor
   - package-ecosystem: gradle
-    target-branch: 6.1.x
+    target-branch: 6.2.x
     directory: /
     schedule:
       interval: daily
@@ -55,7 +55,7 @@ updates:
           - version-update:semver-major
           - version-update:semver-minor
   - package-ecosystem: gradle
-    target-branch: 6.2.x
+    target-branch: 6.3.x
     directory: /
     schedule:
       interval: daily
@@ -108,6 +108,7 @@ updates:
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
+
   - package-ecosystem: github-actions
     target-branch: 5.8.x
     directory: /
@@ -118,20 +119,6 @@ updates:
       - 'in: build'
     ignore:
       - dependency-name: sjohnr/*
-      - dependency-name: spring-io/*
-      - dependency-name: spring-security-release-tools/*
-  - package-ecosystem: github-actions
-    target-branch: 6.1.x
-    directory: /
-    schedule:
-      interval: weekly
-    labels:
-      - 'type: task'
-      - 'in: build'
-    ignore:
-      - dependency-name: sjohnr/*
-      - dependency-name: spring-io/*
-      - dependency-name: spring-security-release-tools/*
   - package-ecosystem: github-actions
     target-branch: 6.2.x
     directory: /
@@ -142,8 +129,16 @@ updates:
       - 'in: build'
     ignore:
       - dependency-name: sjohnr/*
-      - dependency-name: spring-io/*
-      - dependency-name: spring-security-release-tools/*
+  - package-ecosystem: github-actions
+    target-branch: 6.3.x
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - 'type: task'
+      - 'in: build'
+    ignore:
+      - dependency-name: sjohnr/*
   - package-ecosystem: github-actions
     target-branch: main
     directory: /
@@ -154,8 +149,6 @@ updates:
       - 'in: build'
     ignore:
       - dependency-name: sjohnr/*
-      - dependency-name: spring-io/*
-      - dependency-name: spring-security-release-tools/*
   - package-ecosystem: github-actions
     target-branch: docs-build
     directory: /
@@ -166,11 +159,30 @@ updates:
       - 'in: build'
     ignore:
       - dependency-name: sjohnr/*
-      - dependency-name: spring-io/*
-      - dependency-name: spring-security-release-tools/*
 
   - package-ecosystem: npm
     target-branch: docs-build
     directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    target-branch: main
+    directory: /docs
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    target-branch: 6.3.x
+    directory: /docs
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    target-branch: 6.2.x
+    directory: /docs
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    target-branch: 5.8.x
+    directory: /docs
     schedule:
       interval: weekly
