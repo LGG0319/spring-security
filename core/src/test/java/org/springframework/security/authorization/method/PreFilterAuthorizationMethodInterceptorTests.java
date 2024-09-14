@@ -170,15 +170,6 @@ public class PreFilterAuthorizationMethodInterceptorTests {
 	}
 
 	@Test
-	public void checkInheritedAnnotationsWhenDuplicatedThenAnnotationConfigurationException() throws Exception {
-		MockMethodInvocation methodInvocation = new MockMethodInvocation(new TestClass(), TestClass.class,
-				"inheritedAnnotations");
-		PreFilterAuthorizationMethodInterceptor advice = new PreFilterAuthorizationMethodInterceptor();
-		assertThatExceptionOfType(AnnotationConfigurationException.class)
-			.isThrownBy(() -> advice.invoke(methodInvocation));
-	}
-
-	@Test
 	public void checkInheritedAnnotationsWhenConflictingThenAnnotationConfigurationException() throws Exception {
 		MockMethodInvocation methodInvocation = new MockMethodInvocation(new ConflictingAnnotations(),
 				ConflictingAnnotations.class, "inheritedAnnotations");
@@ -222,32 +213,6 @@ public class PreFilterAuthorizationMethodInterceptorTests {
 		advice.invoke(invocation);
 		verify(strategy).getContext();
 		SecurityContextHolder.setContextHolderStrategy(saved);
-	}
-
-	@Test
-	public void checkPreFilterWhenMethodsFromInheritThenApplies() throws Throwable {
-		List<String> list = new ArrayList<>();
-		list.add("john");
-		list.add("bob");
-		MockMethodInvocation invocation = new MockMethodInvocation(new PreFilterClass(), PreFilterClass.class,
-				"inheritMethod", new Class[] { List.class }, new Object[] { list });
-		PreFilterAuthorizationMethodInterceptor advice = new PreFilterAuthorizationMethodInterceptor();
-		advice.invoke(invocation);
-		assertThat(list).hasSize(1);
-		assertThat(list.get(0)).isEqualTo("john");
-	}
-
-	@PreFilter("filterObject == 'john'")
-	public static class PreFilterClass extends ParentClass {
-
-	}
-
-	public static class ParentClass {
-
-		public void inheritMethod(List<String> list) {
-
-		}
-
 	}
 
 	@PreFilter("filterObject == 'john'")
@@ -297,12 +262,10 @@ public class PreFilterAuthorizationMethodInterceptorTests {
 
 	}
 
-	public static class ConflictingAnnotations implements InterfaceAnnotationsThree {
+	public static class ConflictingAnnotations implements InterfaceAnnotationsOne, InterfaceAnnotationsTwo {
 
 		@Override
-		@PreFilter("filterObject == 'jack'")
 		public void inheritedAnnotations() {
-
 		}
 
 	}

@@ -110,15 +110,6 @@ public class PostFilterAuthorizationMethodInterceptorTests {
 	}
 
 	@Test
-	public void checkInheritedAnnotationsWhenDuplicatedThenAnnotationConfigurationException() throws Exception {
-		MockMethodInvocation methodInvocation = new MockMethodInvocation(new TestClass(), TestClass.class,
-				"inheritedAnnotations");
-		PostFilterAuthorizationMethodInterceptor advice = new PostFilterAuthorizationMethodInterceptor();
-		assertThatExceptionOfType(AnnotationConfigurationException.class)
-			.isThrownBy(() -> advice.invoke(methodInvocation));
-	}
-
-	@Test
 	public void checkInheritedAnnotationsWhenConflictingThenAnnotationConfigurationException() throws Exception {
 		MockMethodInvocation methodInvocation = new MockMethodInvocation(new ConflictingAnnotations(),
 				ConflictingAnnotations.class, "inheritedAnnotations");
@@ -170,34 +161,6 @@ public class PostFilterAuthorizationMethodInterceptorTests {
 		SecurityContextHolder.setContextHolderStrategy(saved);
 	}
 
-	@Test
-	public void checkPostFilterWhenMethodsFromInheritThenApplies() throws Throwable {
-		String[] array = { "john", "bob" };
-		MockMethodInvocation methodInvocation = new MockMethodInvocation(new PostFilterClass(), PostFilterClass.class,
-				"inheritMethod", new Class[] { String[].class }, new Object[] { array }) {
-			@Override
-			public Object proceed() {
-				return array;
-			}
-		};
-		PostFilterAuthorizationMethodInterceptor advice = new PostFilterAuthorizationMethodInterceptor();
-		Object result = advice.invoke(methodInvocation);
-		assertThat(result).asInstanceOf(InstanceOfAssertFactories.array(String[].class)).containsOnly("john");
-	}
-
-	@PostFilter("filterObject == 'john'")
-	public static class PostFilterClass extends ParentClass {
-
-	}
-
-	public static class ParentClass {
-
-		public String[] inheritMethod(String[] array) {
-			return array;
-		}
-
-	}
-
 	@PostFilter("filterObject == 'john'")
 	public static class TestClass implements InterfaceAnnotationsOne, InterfaceAnnotationsTwo {
 
@@ -230,12 +193,10 @@ public class PostFilterAuthorizationMethodInterceptorTests {
 
 	}
 
-	public static class ConflictingAnnotations implements InterfaceAnnotationsThree {
+	public static class ConflictingAnnotations implements InterfaceAnnotationsOne, InterfaceAnnotationsTwo {
 
 		@Override
-		@PostFilter("filterObject == 'jack'")
 		public void inheritedAnnotations() {
-
 		}
 
 	}

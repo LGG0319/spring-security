@@ -16,17 +16,18 @@
 
 package org.springframework.security.authorization.method;
 
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.function.Function;
 
 import reactor.util.annotation.NonNull;
 
-import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.expression.Expression;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AnnotationTemplateExpressionDefaults;
+import org.springframework.security.core.annotation.SecurityAnnotationScanner;
+import org.springframework.security.core.annotation.SecurityAnnotationScanners;
 import org.springframework.util.Assert;
 
 /**
@@ -40,19 +41,24 @@ final class PreAuthorizeExpressionAttributeRegistry extends AbstractExpressionAt
 
 	private final MethodAuthorizationDeniedHandler defaultHandler = new ThrowingMethodAuthorizationDeniedHandler();
 
+	private final SecurityAnnotationScanner<HandleAuthorizationDenied> handleAuthorizationDeniedScanner = SecurityAnnotationScanners
+		.requireUnique(HandleAuthorizationDenied.class);
+
 	private Function<Class<? extends MethodAuthorizationDeniedHandler>, MethodAuthorizationDeniedHandler> handlerResolver;
 
+	private SecurityAnnotationScanner<PreAuthorize> preAuthorizeScanner = SecurityAnnotationScanners
+		.requireUnique(PreAuthorize.class);
+
 	PreAuthorizeExpressionAttributeRegistry() {
-		this.handlerResolver = (clazz) -> this.defaultHandler;
+		this.handlerResolver = (clazz) -> new ReflectiveMethodAuthorizationDeniedHandler(clazz,
+				PreAuthorizeAuthorizationManager.class);
 	}
 
 	@NonNull
 	@Override
 	ExpressionAttribute resolveAttribute(Method method, Class<?> targetClass) {
-		// 使用反射获取请求方法的注解   通过Aop工具类，
-		Method specificMethod = AopUtils.getMostSpecificMethod(method, targetClass);
 		// 获取权限注解方式中的权限码
-		PreAuthorize preAuthorize = findPreAuthorizeAnnotation(specificMethod, targetClass);
+		PreAuthorize preAuthorize = findPreAuthorizeAnnotation(method, targetClass);
 		if (preAuthorize == null) {
 			return ExpressionAttribute.NULL_ATTRIBUTE;
 		}
@@ -63,13 +69,8 @@ final class PreAuthorizeExpressionAttributeRegistry extends AbstractExpressionAt
 	}
 
 	private MethodAuthorizationDeniedHandler resolveHandler(Method method, Class<?> targetClass) {
-		Function<AnnotatedElement, HandleAuthorizationDenied> lookup = AuthorizationAnnotationUtils
-			.withDefaults(HandleAuthorizationDenied.class);
-		HandleAuthorizationDenied deniedHandler = lookup.apply(method);
-		if (deniedHandler != null) {
-			return this.handlerResolver.apply(deniedHandler.handlerClass());
-		}
-		deniedHandler = lookup.apply(targetClass(method, targetClass));
+		Class<?> targetClassToUse = targetClass(method, targetClass);
+		HandleAuthorizationDenied deniedHandler = this.handleAuthorizationDeniedScanner.scan(method, targetClassToUse);
 		if (deniedHandler != null) {
 			return this.handlerResolver.apply(deniedHandler.handlerClass());
 		}
@@ -78,9 +79,8 @@ final class PreAuthorizeExpressionAttributeRegistry extends AbstractExpressionAt
 
 	// 获取权限注解方式中的权限码
 	private PreAuthorize findPreAuthorizeAnnotation(Method method, Class<?> targetClass) {
-		Function<AnnotatedElement, PreAuthorize> lookup = findUniqueAnnotation(PreAuthorize.class);
-		PreAuthorize preAuthorize = lookup.apply(method);
-		return (preAuthorize != null) ? preAuthorize : lookup.apply(targetClass(method, targetClass));
+		Class<?> targetClassToUse = targetClass(method, targetClass);
+		return this.preAuthorizeScanner.scan(method, targetClassToUse);
 	}
 
 	/**
@@ -91,6 +91,10 @@ final class PreAuthorizeExpressionAttributeRegistry extends AbstractExpressionAt
 	void setApplicationContext(ApplicationContext context) {
 		Assert.notNull(context, "context cannot be null");
 		this.handlerResolver = (clazz) -> resolveHandler(context, clazz);
+	}
+
+	void setTemplateDefaults(AnnotationTemplateExpressionDefaults defaults) {
+		this.preAuthorizeScanner = SecurityAnnotationScanners.requireUnique(PreAuthorize.class, defaults);
 	}
 
 	private MethodAuthorizationDeniedHandler resolveHandler(ApplicationContext context,

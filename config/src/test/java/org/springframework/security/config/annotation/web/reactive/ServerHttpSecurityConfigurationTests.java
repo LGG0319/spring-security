@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,10 @@
 
 package org.springframework.security.config.annotation.web.reactive;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.net.URI;
 
 import org.junit.jupiter.api.Test;
@@ -26,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.authentication.password.CompromisedPasswordDecision;
 import org.springframework.security.authentication.password.CompromisedPasswordException;
 import org.springframework.security.authentication.password.ReactiveCompromisedPasswordChecker;
@@ -34,8 +39,13 @@ import org.springframework.security.config.test.SpringTestContext;
 import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.config.users.ReactiveAuthenticationTestConfiguration;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AnnotationTemplateExpressionDefaults;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.annotation.CurrentSecurityContext;
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.PasswordEncodedUser;
+import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.server.DefaultServerRedirectStrategy;
@@ -43,12 +53,16 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.config.EnableWebFlux;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.server.adapter.WebHttpHandlerBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf;
+import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockAuthentication;
+import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.springSecurity;
 
 /**
  * Tests for {@link ServerHttpSecurityConfiguration}.
@@ -67,7 +81,10 @@ public class ServerHttpSecurityConfigurationTests {
 		if (!context.containsBean(WebHttpHandlerBuilder.WEB_HANDLER_BEAN_NAME)) {
 			return;
 		}
-		this.webClient = WebTestClient.bindToApplicationContext(context).configureClient().build();
+		this.webClient = WebTestClient.bindToApplicationContext(context)
+			.apply(springSecurity())
+			.configureClient()
+			.build();
 	}
 
 	@Test
@@ -144,6 +161,48 @@ public class ServerHttpSecurityConfigurationTests {
 				.expectStatus().is3xxRedirection()
 				.expectHeader().location("/reset-password");
 		// @formatter:on
+	}
+
+	@Test
+	public void metaAnnotationWhenTemplateDefaultsBeanThenResolvesExpression() throws Exception {
+		this.spring.register(MetaAnnotationPlaceholderConfig.class).autowire();
+		Authentication user = new TestingAuthenticationToken("user", "password", "ROLE_USER");
+		this.webClient.mutateWith(mockAuthentication(user))
+			.get()
+			.uri("/hi")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.isEqualTo("Hi, Stranger!");
+		Authentication harold = new TestingAuthenticationToken("harold", "password", "ROLE_USER");
+		this.webClient.mutateWith(mockAuthentication(harold))
+			.get()
+			.uri("/hi")
+			.exchange()
+			.expectBody(String.class)
+			.isEqualTo("Hi, Harold!");
+	}
+
+	@Test
+	public void resoleMetaAnnotationWhenTemplateDefaultsBeanThenResolvesExpression() throws Exception {
+		this.spring.register(MetaAnnotationPlaceholderConfig.class).autowire();
+		Authentication user = new TestingAuthenticationToken("user", "password", "ROLE_USER");
+		this.webClient.mutateWith(mockAuthentication(user))
+			.get()
+			.uri("/hello")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.isEqualTo("user");
+		Authentication harold = new TestingAuthenticationToken("harold", "password", "ROLE_USER");
+		this.webClient.mutateWith(mockAuthentication(harold))
+			.get()
+			.uri("/hello")
+			.exchange()
+			.expectBody(String.class)
+			.isEqualTo("harold");
 	}
 
 	@Configuration
@@ -233,6 +292,78 @@ public class ServerHttpSecurityConfigurationTests {
 				return Mono.just(new CompromisedPasswordDecision(true));
 			}
 			return Mono.just(new CompromisedPasswordDecision(false));
+		}
+
+	}
+
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target(ElementType.PARAMETER)
+	@AuthenticationPrincipal(expression = "#this.equals('{value}')")
+	@interface IsUser {
+
+		String value() default "user";
+
+	}
+
+	@Target({ ElementType.PARAMETER })
+	@Retention(RetentionPolicy.RUNTIME)
+	@CurrentSecurityContext(expression = "authentication.{property}")
+	@interface CurrentAuthenticationProperty {
+
+		String property();
+
+	}
+
+	@RestController
+	static class TestController {
+
+		@GetMapping("/hi")
+		String ifUser(@IsUser("harold") boolean isHarold) {
+			if (isHarold) {
+				return "Hi, Harold!";
+			}
+			else {
+				return "Hi, Stranger!";
+			}
+		}
+
+		@GetMapping("/hello")
+		String getCurrentAuthenticationProperty(
+				@CurrentAuthenticationProperty(property = "principal") String principal) {
+			return principal;
+		}
+
+	}
+
+	@Configuration
+	@EnableWebFlux
+	@EnableWebFluxSecurity
+	static class MetaAnnotationPlaceholderConfig {
+
+		@Bean
+		SecurityWebFilterChain filterChain(ServerHttpSecurity http) {
+			// @formatter:off
+			http
+				.authorizeExchange((authorize) -> authorize.anyExchange().authenticated())
+				.httpBasic(Customizer.withDefaults());
+			// @formatter:on
+			return http.build();
+		}
+
+		@Bean
+		ReactiveUserDetailsService userDetailsService() {
+			return new MapReactiveUserDetailsService(
+					User.withUsername("user").password("password").authorities("app").build());
+		}
+
+		@Bean
+		TestController testController() {
+			return new TestController();
+		}
+
+		@Bean
+		AnnotationTemplateExpressionDefaults templateExpressionDefaults() {
+			return new AnnotationTemplateExpressionDefaults();
 		}
 
 	}

@@ -118,7 +118,7 @@ image::{figures}/filterchainproxy.png[]
 [[servlet-securityfilterchain]]
 == SecurityFilterChain
 
-{security-api-url}org/springframework/security/web/SecurityFilterChain.html[`SecurityFilterChain`]  is used by <<servlet-filterchainproxy>> to determine which Spring Security `Filter` instances should be invoked for the current request.
+javadoc:org.springframework.security.web.SecurityFilterChain[]  is used by <<servlet-filterchainproxy>> to determine which Spring Security `Filter` instances should be invoked for the current request.
 
 The following image shows the role of `SecurityFilterChain`.
 
@@ -250,11 +250,11 @@ If you want to see the list of filters invoked for a particular request, you can
 Often times, it is useful to see the list of security ``Filter``s that are invoked for a particular request.
 For example, you want to make sure that the <<adding-custom-filter,filter you have added>> is in the list of the security filters.
 
-The list of filters is printed at INFO level on the application startup, so you can see something like the following on the console output for example:
+The list of filters is printed at DEBUG level on the application startup, so you can see something like the following on the console output for example:
 
 [source,text,role="terminal"]
 ----
-2023-06-14T08:55:22.321-03:00  INFO 76975 --- [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [
+2023-06-14T08:55:22.321-03:00  DEBUG 76975 --- [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [
 org.springframework.security.web.session.DisableEncodeUrlFilter@404db674,
 org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@50f097b5,
 org.springframework.security.web.context.SecurityContextHolderFilter@6fc6deb7,
@@ -372,7 +372,7 @@ You can also use `HttpSecurity#addFilterAfter` to add the filter after a particu
 
 And that's it, now the `TenantFilter` will be invoked in the filter chain and will check if the current user has access to the tenant id.
 
-Be careful when you declare your filter as a Spring bean, either by annotating it with `@Component` or by declaring it as a bean in your configuration, because Spring Boot will automatically {spring-boot-reference-url}web.html#web.servlet.embedded-container.servlets-filters-listeners.beans[register it with the embedded container].
+Be careful when you declare your filter as a Spring bean, either by annotating it with `@Component` or by declaring it as a bean in your configuration, because Spring Boot will automatically {spring-boot-reference-url}reference/web/servlet.html#web.servlet.embedded-container.servlets-filters-listeners.beans[register it with the embedded container].
 That may cause the filter to be invoked twice, once by the container and once by Spring Security and in a different order.
 
 If you still want to declare your filter as a Spring bean to take advantage of dependency injection for example, and avoid the duplicate invocation, you can tell Spring Boot to not register it with the container by declaring a `FilterRegistrationBean` bean and setting its `enabled` property to `false`:
@@ -392,7 +392,7 @@ public FilterRegistrationBean<TenantFilter> tenantFilterRegistration(TenantFilte
 == Handling Security Exceptions
 
 
-The {security-api-url}org/springframework/security/web/access/ExceptionTranslationFilter.html[`ExceptionTranslationFilter`] allows translation of {security-api-url}org/springframework/security/access/AccessDeniedException.html[`AccessDeniedException`] and {security-api-url}/org/springframework/security/core/AuthenticationException.html[`AuthenticationException`] into HTTP responses.
+The javadoc:org.springframework.security.web.access.ExceptionTranslationFilter[] allows translation of javadoc:org.springframework.security.access.AccessDeniedException[] and javadoc:org.springframework.security.core.AuthenticationException[] into HTTP responses.
 
 `ExceptionTranslationFilter` is inserted into the <<servlet-filterchainproxy>> as one of the <<servlet-security-filters>>.
 
@@ -447,7 +447,7 @@ In Spring Security this is done by saving the `HttpServletRequest` using a <<req
 [[requestcache]]
 === RequestCache
 
-The `HttpServletRequest` is saved in the {security-api-url}org/springframework/security/web/savedrequest/RequestCache.html[`RequestCache`].
+The `HttpServletRequest` is saved in the javadoc:org.springframework.security.web.savedrequest.RequestCache[].
 When the user successfully authenticates, the `RequestCache` is used to replay the original request.
 The <<requestcacheawarefilter,`RequestCacheAwareFilter`>> uses the `RequestCache` to get the saved `HttpServletRequest` after the user authenticates, while the `ExceptionTranslationFilter` uses the `RequestCache` to save the `HttpServletRequest` after it detects `AuthenticationException`, before redirecting the user to the login endpoint.
 
@@ -463,7 +463,7 @@ There are a number of reasons you may want to not store the user's unauthenticat
 You may want to offload that storage onto the user's browser or store it in a database.
 Or you may want to shut off this feature since you always want to redirect the user to the home page instead of the page they tried to visit before login.
 
-To do that, you can use {security-api-url}org/springframework/security/web/savedrequest/NullRequestCache.html[the `NullRequestCache` implementation].
+To do that, you can use the javadoc:org.springframework.security.web.savedrequest.NullRequestCache[NullRequestCache] implementation.
 
 .Prevent the Request From Being Saved
 [tabs]
@@ -517,7 +517,7 @@ XML::
 [[requestcacheawarefilter]]
 === RequestCacheAwareFilter
 
-The {security-api-url}org/springframework/security/web/savedrequest/RequestCacheAwareFilter.html[`RequestCacheAwareFilter`] uses the <<requestcache,`RequestCache`>> to replay the original request.
+The javadoc:org.springframework.security.web.savedrequest.RequestCacheAwareFilter[] uses the <<requestcache,`RequestCache`>> to replay the original request.
 
 [[servlet-logging]]
 == Logging

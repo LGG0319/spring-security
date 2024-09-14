@@ -20,13 +20,25 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import reactor.test.StepVerifier;
 
+import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Role;
+import org.springframework.security.access.PermissionEvaluator;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.config.test.SpringTestContext;
 import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.test.context.annotation.SecurityTestExecutionListeners;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith({ SpringExtension.class, SpringTestContextExtension.class })
 @SecurityTestExecutionListeners
@@ -201,6 +213,21 @@ public class PrePostReactiveMethodSecurityConfigurationTests {
 		StepVerifier.create(service.preAuthorizeWithMaskAnnotationUsingBean()).expectNext("ok").verifyComplete();
 	}
 
+	@Test
+	@WithMockUser(roles = "ADMIN")
+	public void preAuthorizeWhenCustomMethodSecurityExpressionHandlerThenUses() {
+		this.spring.register(MethodSecurityServiceEnabledConfig.class, PermissionEvaluatorConfig.class).autowire();
+		ReactiveMethodSecurityService service = this.spring.getContext().getBean(ReactiveMethodSecurityService.class);
+		PermissionEvaluator permissionEvaluator = this.spring.getContext().getBean(PermissionEvaluator.class);
+		given(permissionEvaluator.hasPermission(any(), eq("grant"), any())).willReturn(true);
+		given(permissionEvaluator.hasPermission(any(), eq("deny"), any())).willReturn(false);
+		StepVerifier.create(service.preAuthorizeHasPermission("grant")).expectNext("ok").verifyComplete();
+		StepVerifier.create(service.preAuthorizeHasPermission("deny"))
+			.expectError(AuthorizationDeniedException.class)
+			.verify();
+		verify(permissionEvaluator, times(2)).hasPermission(any(), any(), any());
+	}
+
 	@Configuration
 	@EnableReactiveMethodSecurity
 	static class MethodSecurityServiceEnabledConfig {
@@ -208,6 +235,25 @@ public class PrePostReactiveMethodSecurityConfigurationTests {
 		@Bean
 		ReactiveMethodSecurityService methodSecurityService() {
 			return new ReactiveMethodSecurityServiceImpl();
+		}
+
+	}
+
+	@Configuration
+	static class PermissionEvaluatorConfig {
+
+		@Bean
+		static PermissionEvaluator permissionEvaluator() {
+			return mock(PermissionEvaluator.class);
+		}
+
+		@Bean
+		@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+		static DefaultMethodSecurityExpressionHandler methodSecurityExpressionHandler(
+				PermissionEvaluator permissionEvaluator) {
+			DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+			handler.setPermissionEvaluator(permissionEvaluator);
+			return handler;
 		}
 
 	}

@@ -194,6 +194,7 @@ import org.springframework.security.web.server.savedrequest.ServerRequestCache;
 import org.springframework.security.web.server.savedrequest.ServerRequestCacheWebFilter;
 import org.springframework.security.web.server.savedrequest.WebSessionServerRequestCache;
 import org.springframework.security.web.server.transport.HttpsRedirectWebFilter;
+import org.springframework.security.web.server.ui.DefaultResourcesWebFilter;
 import org.springframework.security.web.server.ui.LoginPageGeneratingWebFilter;
 import org.springframework.security.web.server.ui.LogoutPageGeneratingWebFilter;
 import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
@@ -206,6 +207,7 @@ import org.springframework.security.web.server.util.matcher.ServerWebExchangeMat
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.CorsProcessor;
 import org.springframework.web.cors.reactive.CorsWebFilter;
@@ -2957,7 +2959,8 @@ public class ServerHttpSecurity {
 			if (http.authenticationEntryPoint != null) {
 				return;
 			}
-			if (http.formLogin != null && http.formLogin.isEntryPointExplicit) {
+			if (http.formLogin != null && http.formLogin.isEntryPointExplicit
+					|| http.oauth2Login != null && StringUtils.hasText(http.oauth2Login.loginPage)) {
 				return;
 			}
 			LoginPageGeneratingWebFilter loginPage = null;
@@ -2974,6 +2977,7 @@ public class ServerHttpSecurity {
 			}
 			if (loginPage != null) {
 				http.addFilterAt(loginPage, SecurityWebFiltersOrder.LOGIN_PAGE_GENERATING);
+				http.addFilterBefore(DefaultResourcesWebFilter.css(), SecurityWebFiltersOrder.LOGIN_PAGE_GENERATING);
 				if (http.logout != null) {
 					http.addFilterAt(new LogoutPageGeneratingWebFilter(),
 							SecurityWebFiltersOrder.LOGOUT_PAGE_GENERATING);
@@ -4133,6 +4137,8 @@ public class ServerHttpSecurity {
 
 		private ServerAuthenticationFailureHandler authenticationFailureHandler;
 
+		private String loginPage;
+
 		private OAuth2LoginSpec() {
 		}
 
@@ -4363,6 +4369,19 @@ public class ServerHttpSecurity {
 		}
 
 		/**
+		 * Specifies the URL to send users to if login is required. A default login page
+		 * will be generated when this attribute is not specified.
+		 * @param loginPage the URL to send users to if login is required
+		 * @return the {@link OAuth2LoginSpec} for further configuration
+		 * @since 6.4
+		 */
+		public OAuth2LoginSpec loginPage(String loginPage) {
+			Assert.hasText(loginPage, "loginPage cannot be empty");
+			this.loginPage = loginPage;
+			return this;
+		}
+
+		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
 		 * @deprecated For removal in 7.0. Use {@link #oauth2Login(Customizer)} or
@@ -4408,12 +4427,6 @@ public class ServerHttpSecurity {
 		}
 
 		private void setDefaultEntryPoints(ServerHttpSecurity http) {
-			String defaultLoginPage = "/login";
-			Map<String, String> urlToText = http.oauth2Login.getLinks();
-			String providerLoginPage = null;
-			if (urlToText.size() == 1) {
-				providerLoginPage = urlToText.keySet().iterator().next();
-			}
 			MediaTypeServerWebExchangeMatcher htmlMatcher = new MediaTypeServerWebExchangeMatcher(
 					MediaType.APPLICATION_XHTML_XML, new MediaType("image", "*"), MediaType.TEXT_HTML,
 					MediaType.TEXT_PLAIN);
@@ -4427,22 +4440,34 @@ public class ServerHttpSecurity {
 			ServerWebExchangeMatcher notXhrMatcher = new NegatedServerWebExchangeMatcher(xhrMatcher);
 			ServerWebExchangeMatcher defaultEntryPointMatcher = new AndServerWebExchangeMatcher(notXhrMatcher,
 					htmlMatcher);
-			if (providerLoginPage != null) {
-				ServerWebExchangeMatcher loginPageMatcher = new PathPatternParserServerWebExchangeMatcher(
-						defaultLoginPage);
-				ServerWebExchangeMatcher faviconMatcher = new PathPatternParserServerWebExchangeMatcher("/favicon.ico");
-				ServerWebExchangeMatcher defaultLoginPageMatcher = new AndServerWebExchangeMatcher(
-						new OrServerWebExchangeMatcher(loginPageMatcher, faviconMatcher), defaultEntryPointMatcher);
+			String loginPage = "/login";
+			if (StringUtils.hasText(this.loginPage)) {
+				loginPage = this.loginPage;
+			}
+			else {
+				Map<String, String> urlToText = http.oauth2Login.getLinks();
+				String providerLoginPage = null;
+				if (urlToText.size() == 1) {
+					providerLoginPage = urlToText.keySet().iterator().next();
+				}
+				if (providerLoginPage != null) {
+					ServerWebExchangeMatcher loginPageMatcher = new PathPatternParserServerWebExchangeMatcher(
+							loginPage);
+					ServerWebExchangeMatcher faviconMatcher = new PathPatternParserServerWebExchangeMatcher(
+							"/favicon.ico");
+					ServerWebExchangeMatcher defaultLoginPageMatcher = new AndServerWebExchangeMatcher(
+							new OrServerWebExchangeMatcher(loginPageMatcher, faviconMatcher), defaultEntryPointMatcher);
 
-				ServerWebExchangeMatcher matcher = new AndServerWebExchangeMatcher(notXhrMatcher,
-						new NegatedServerWebExchangeMatcher(defaultLoginPageMatcher));
-				RedirectServerAuthenticationEntryPoint entryPoint = new RedirectServerAuthenticationEntryPoint(
-						providerLoginPage);
-				entryPoint.setRequestCache(http.requestCache.requestCache);
-				http.defaultEntryPoints.add(new DelegateEntry(matcher, entryPoint));
+					ServerWebExchangeMatcher matcher = new AndServerWebExchangeMatcher(notXhrMatcher,
+							new NegatedServerWebExchangeMatcher(defaultLoginPageMatcher));
+					RedirectServerAuthenticationEntryPoint entryPoint = new RedirectServerAuthenticationEntryPoint(
+							providerLoginPage);
+					entryPoint.setRequestCache(http.requestCache.requestCache);
+					http.defaultEntryPoints.add(new DelegateEntry(matcher, entryPoint));
+				}
 			}
 			RedirectServerAuthenticationEntryPoint defaultEntryPoint = new RedirectServerAuthenticationEntryPoint(
-					defaultLoginPage);
+					loginPage);
 			defaultEntryPoint.setRequestCache(http.requestCache.requestCache);
 			http.defaultEntryPoints.add(new DelegateEntry(defaultEntryPointMatcher, defaultEntryPoint));
 		}
@@ -4532,9 +4557,12 @@ public class ServerHttpSecurity {
 		}
 
 		private OAuth2AuthorizationRequestRedirectWebFilter getRedirectWebFilter() {
-			OAuth2AuthorizationRequestRedirectWebFilter oauthRedirectFilter;
-			if (this.authorizationRequestResolver != null) {
-				return new OAuth2AuthorizationRequestRedirectWebFilter(this.authorizationRequestResolver);
+			ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver = this.authorizationRequestResolver;
+			if (authorizationRequestResolver == null) {
+				authorizationRequestResolver = getBeanOrNull(ServerOAuth2AuthorizationRequestResolver.class);
+			}
+			if (authorizationRequestResolver != null) {
+				return new OAuth2AuthorizationRequestRedirectWebFilter(authorizationRequestResolver);
 			}
 			return new OAuth2AuthorizationRequestRedirectWebFilter(getClientRegistrationRepository());
 		}

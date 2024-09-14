@@ -26,6 +26,7 @@ import org.springframework.context.annotation.AutoProxyRegistrar;
 import org.springframework.context.annotation.ImportSelector;
 import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.lang.NonNull;
+import org.springframework.util.ClassUtils;
 
 /**
  * Dynamically determines which imports to include using the {@link EnableMethodSecurity}
@@ -37,6 +38,9 @@ import org.springframework.lang.NonNull;
  * 导入了切面代理注册器和方法级别的权限配置类PrePostMethodSecurityConfiguration，用于方法级别的权限配置处理
  */
 final class MethodSecuritySelector implements ImportSelector {
+
+	private static final boolean isDataPresent = ClassUtils
+		.isPresent("org.springframework.security.data.aot.hint.AuthorizeReturnObjectDataHintsRegistrar", null);
 
 	private final ImportSelector autoProxy = new AutoProxyRegistrarSelector();
 
@@ -58,6 +62,9 @@ final class MethodSecuritySelector implements ImportSelector {
 			imports.add(Jsr250MethodSecurityConfiguration.class.getName());
 		}
 		imports.add(AuthorizationProxyConfiguration.class.getName());
+		if (isDataPresent) {
+			imports.add(AuthorizationProxyDataConfiguration.class.getName());
+		}
 		return imports.toArray(new String[0]);
 	}
 
