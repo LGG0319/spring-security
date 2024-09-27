@@ -28,9 +28,12 @@ import org.springframework.beans.factory.InitializingBean;
  * @param <T> the bound of the types of Objects this {@link ObjectPostProcessor} supports.
  * @author Rob Winch
  * @since 3.2
+ * @deprecated please use {@link org.springframework.security.config.ObjectPostProcessor}
  * 允许初始化对象。通常用来调用 Aware methods、InitializingBean#afterPropertiesSet()。并且保证 DisposableBean#destroy() 被调用。
+ * instead
  */
-public interface ObjectPostProcessor<T> {
+@Deprecated
+public interface ObjectPostProcessor<T> extends org.springframework.security.config.ObjectPostProcessor<T> {
 
 	/**
 	 * Initialize the object possibly returning a modified instance that should be used

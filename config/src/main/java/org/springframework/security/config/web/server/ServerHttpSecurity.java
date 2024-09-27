@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,13 +34,13 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import io.micrometer.observation.ObservationRegistry;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
 import org.springframework.core.ResolvableType;
@@ -55,10 +56,9 @@ import org.springframework.security.authentication.ReactiveAuthenticationManager
 import org.springframework.security.authorization.AuthenticatedReactiveAuthorizationManager;
 import org.springframework.security.authorization.AuthorityReactiveAuthorizationManager;
 import org.springframework.security.authorization.AuthorizationDecision;
-import org.springframework.security.authorization.ObservationReactiveAuthorizationManager;
 import org.springframework.security.authorization.ReactiveAuthorizationManager;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.configurers.oauth2.client.OidcLogoutConfigurer;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -1735,26 +1735,34 @@ public class ServerHttpSecurity {
 	}
 
 	private <T> T getBeanOrDefault(Class<T> beanClass, T defaultInstance) {
-		T bean = getBeanOrNull(beanClass);
-		if (bean == null) {
+		if (this.context == null) {
 			return defaultInstance;
 		}
-		return bean;
+		return this.context.getBeanProvider(beanClass).getIfUnique(() -> defaultInstance);
+	}
+
+	private <T> ObjectProvider<T> getBeanProvider(ResolvableType type) {
+		if (this.context == null) {
+			return new ObjectProvider<>() {
+				@Override
+				public Iterator<T> iterator() {
+					return Collections.emptyIterator();
+				}
+			};
+		}
+		return this.context.getBeanProvider(type);
 	}
 
 	private <T> T getBeanOrNull(Class<T> beanClass) {
 		return getBeanOrNull(ResolvableType.forClass(beanClass));
 	}
 
+	@SuppressWarnings("unchecked")
 	private <T> T getBeanOrNull(ResolvableType type) {
 		if (this.context == null) {
 			return null;
 		}
-		String[] names = this.context.getBeanNamesForType(type);
-		if (names.length == 1) {
-			return (T) this.context.getBean(names[0]);
-		}
-		return null;
+		return (T) this.context.getBeanProvider(type).getIfUnique();
 	}
 
 	private <T> T getBeanOrNull(String beanName, Class<T> requiredClass) {
@@ -1799,6 +1807,17 @@ public class ServerHttpSecurity {
 		private boolean anyExchangeRegistered;
 
 		private PathPatternParser pathPatternParser;
+
+		private ObjectPostProcessor<ReactiveAuthorizationManager<ServerWebExchange>> postProcessor = ObjectPostProcessor
+			.identity();
+
+		public AuthorizeExchangeSpec() {
+			ResolvableType type = ResolvableType.forClassWithGenerics(ObjectPostProcessor.class,
+					ResolvableType.forClassWithGenerics(ReactiveAuthorizationManager.class, ServerWebExchange.class));
+			ObjectProvider<ObjectPostProcessor<ReactiveAuthorizationManager<ServerWebExchange>>> postProcessor = getBeanProvider(
+					type);
+			postProcessor.ifUnique((p) -> this.postProcessor = p);
+		}
 
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
@@ -1852,10 +1871,7 @@ public class ServerHttpSecurity {
 			Assert.state(this.matcher == null,
 					() -> "The matcher " + this.matcher + " does not have an access rule defined");
 			ReactiveAuthorizationManager<ServerWebExchange> manager = this.managerBldr.build();
-			ObservationRegistry registry = getBeanOrDefault(ObservationRegistry.class, ObservationRegistry.NOOP);
-			if (!registry.isNoop()) {
-				manager = new ObservationReactiveAuthorizationManager<>(registry, manager);
-			}
+			manager = this.postProcessor.postProcess(manager);
 			AuthorizationWebFilter result = new AuthorizationWebFilter(manager);
 			http.addFilterAt(result, SecurityWebFiltersOrder.AUTHORIZATION);
 		}
@@ -4814,9 +4830,20 @@ public class ServerHttpSecurity {
 		private ReactiveAuthenticationManager getAuthenticationManager() {
 			if (this.authenticationManager == null) {
 				this.authenticationManager = new OAuth2AuthorizationCodeReactiveAuthenticationManager(
-						new WebClientReactiveAuthorizationCodeTokenResponseClient());
+						getAuthorizationCodeTokenResponseClient());
 			}
 			return this.authenticationManager;
+		}
+
+		private ReactiveOAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> getAuthorizationCodeTokenResponseClient() {
+			ResolvableType resolvableType = ResolvableType.forClassWithGenerics(
+					ReactiveOAuth2AccessTokenResponseClient.class, OAuth2AuthorizationCodeGrantRequest.class);
+			ReactiveOAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> accessTokenResponseClient = getBeanOrNull(
+					resolvableType);
+			if (accessTokenResponseClient == null) {
+				accessTokenResponseClient = new WebClientReactiveAuthorizationCodeTokenResponseClient();
+			}
+			return accessTokenResponseClient;
 		}
 
 		/**
@@ -5497,7 +5524,7 @@ public class ServerHttpSecurity {
 
 		private ReactiveOidcSessionRegistry getSessionRegistry() {
 			if (this.sessionRegistry == null && ServerHttpSecurity.this.oauth2Login == null) {
-				return new InMemoryReactiveOidcSessionRegistry();
+				return getBeanOrDefault(ReactiveOidcSessionRegistry.class, new InMemoryReactiveOidcSessionRegistry());
 			}
 			if (this.sessionRegistry == null) {
 				return ServerHttpSecurity.this.oauth2Login.oidcSessionRegistry;
@@ -5529,8 +5556,12 @@ public class ServerHttpSecurity {
 			}
 
 			private ServerLogoutHandler logoutHandler() {
-				OidcBackChannelServerLogoutHandler logoutHandler = new OidcBackChannelServerLogoutHandler();
-				logoutHandler.setSessionRegistry(OidcLogoutSpec.this.getSessionRegistry());
+				OidcBackChannelServerLogoutHandler logoutHandler = getBeanOrNull(
+						OidcBackChannelServerLogoutHandler.class);
+				if (logoutHandler != null) {
+					return logoutHandler;
+				}
+				logoutHandler = new OidcBackChannelServerLogoutHandler(OidcLogoutSpec.this.getSessionRegistry());
 				return logoutHandler;
 			}
 
@@ -5548,9 +5579,9 @@ public class ServerHttpSecurity {
 			 *
 			 * <p>
 			 * By default, the URI is set to
-			 * {@code {baseScheme}://localhost{basePort}/logout}, meaning that the scheme
-			 * and port of the original back-channel request is preserved, while the host
-			 * and endpoint are changed.
+			 * {@code {baseUrl}/logout/connect/back-channel/{registrationId}}, meaning
+			 * that the scheme and port of the original back-channel request is preserved,
+			 * while the host and endpoint are changed.
 			 *
 			 * <p>
 			 * If you are using Spring Security for the logout endpoint, the path part of
@@ -5561,25 +5592,133 @@ public class ServerHttpSecurity {
 			 * that the scheme, server name, or port in the {@code Host} header are
 			 * different from how you would address the same server internally.
 			 * @param logoutUri the URI to request logout on the back-channel
-			 * @return the {@link OidcLogoutConfigurer.BackChannelLogoutConfigurer} for
-			 * further customizations
+			 * @return the {@link BackChannelLogoutConfigurer} for further customizations
 			 * @since 6.2.4
 			 */
 			public BackChannelLogoutConfigurer logoutUri(String logoutUri) {
 				this.logoutHandler = () -> {
-					OidcBackChannelServerLogoutHandler logoutHandler = new OidcBackChannelServerLogoutHandler();
-					logoutHandler.setSessionRegistry(OidcLogoutSpec.this.getSessionRegistry());
+					OidcBackChannelServerLogoutHandler logoutHandler = new OidcBackChannelServerLogoutHandler(
+							OidcLogoutSpec.this.getSessionRegistry());
 					logoutHandler.setLogoutUri(logoutUri);
 					return logoutHandler;
 				};
 				return this;
 			}
 
+			/**
+			 * Configure what and how per-session logout will be performed.
+			 *
+			 * <p>
+			 * This overrides any value given to {@link #logoutUri(String)}
+			 *
+			 * <p>
+			 * By default, the resulting {@link LogoutHandler} will {@code POST} the
+			 * session cookie and OIDC logout token back to the original back-channel
+			 * logout endpoint.
+			 *
+			 * <p>
+			 * Using this method changes the underlying default that {@code POST}s the
+			 * session cookie and CSRF token to your application's {@code /logout}
+			 * endpoint. As such, it is recommended to call this instead of accepting the
+			 * {@code /logout} default as this does not require any special CSRF
+			 * configuration, even if you don't require other changes.
+			 *
+			 * <p>
+			 * For example, configuring Back-Channel Logout in the following way:
+			 *
+			 * <pre>
+			 * 	http
+			 *     	.oidcLogout((oidc) -&gt; oidc
+			 *     		.backChannel((backChannel) -&gt; backChannel
+			 *     			.logoutHandler(new OidcBackChannelServerLogoutHandler())
+			 *     		)
+			 *     	);
+			 * </pre>
+			 *
+			 * will make so that the per-session logout invocation no longer requires
+			 * special CSRF configurations.
+			 *
+			 * <p>
+			 * The default URI is
+			 * {@code {baseUrl}/logout/connect/back-channel/{registrationId}}, which is
+			 * simply an internal version of the same endpoint exposed to your
+			 * Back-Channel services. You can use
+			 * {@link OidcBackChannelServerLogoutHandler#setLogoutUri(String)} to alter
+			 * the scheme, server name, or port in the {@code Host} header to accommodate
+			 * how your application would address itself internally.
+			 *
+			 * <p>
+			 * For example, if the way your application would internally call itself is on
+			 * a different scheme and port than incoming traffic, you can configure the
+			 * endpoint in the following way:
+			 *
+			 * <pre>
+			 * 	http
+			 * 		.oidcLogout((oidc) -&gt; oidc
+			 * 			.backChannel((backChannel) -&gt; backChannel
+			 * 				.logoutUri("http://localhost:9000/logout/connect/back-channel/{registrationId}")
+			 * 			)
+			 * 		);
+			 * </pre>
+			 *
+			 * <p>
+			 * You can also publish it as a {@code @Bean} as follows:
+			 *
+			 * <pre>
+			 *	&commat;Bean
+			 *	OidcBackChannelServerLogoutHandler oidcLogoutHandler() {
+			 *  	OidcBackChannelServerLogoutHandler logoutHandler = new OidcBackChannelServerLogoutHandler();
+			 *  	logoutHandler.setLogoutUri("http://localhost:9000/logout/connect/back-channel/{registrationId}");
+			 *  	return logoutHandler;
+			 *	}
+			 * </pre>
+			 *
+			 * to have the same effect.
+			 * @param logoutHandler the {@link ServerLogoutHandler} to use each individual
+			 * session
+			 * @return {@link BackChannelLogoutConfigurer} for further customizations
+			 * @since 6.4
+			 */
+			public BackChannelLogoutConfigurer logoutHandler(ServerLogoutHandler logoutHandler) {
+				this.logoutHandler = () -> logoutHandler;
+				return this;
+			}
+
 			void configure(ServerHttpSecurity http) {
+				ServerLogoutHandler oidcLogout = this.logoutHandler.get();
+				ServerLogoutHandler sessionLogout = new SecurityContextServerLogoutHandler();
+				LogoutSpec logout = ServerHttpSecurity.this.logout;
+				if (logout != null) {
+					sessionLogout = new DelegatingServerLogoutHandler(logout.logoutHandlers);
+				}
 				OidcBackChannelLogoutWebFilter filter = new OidcBackChannelLogoutWebFilter(authenticationConverter(),
-						authenticationManager());
-				filter.setLogoutHandler(this.logoutHandler.get());
+						authenticationManager(), new EitherLogoutHandler(oidcLogout, sessionLogout));
 				http.addFilterBefore(filter, SecurityWebFiltersOrder.CSRF);
+			}
+
+			private static final class EitherLogoutHandler implements ServerLogoutHandler {
+
+				private final ServerLogoutHandler left;
+
+				private final ServerLogoutHandler right;
+
+				EitherLogoutHandler(ServerLogoutHandler left, ServerLogoutHandler right) {
+					this.left = left;
+					this.right = right;
+				}
+
+				@Override
+				public Mono<Void> logout(WebFilterExchange exchange, Authentication authentication) {
+					return exchange.getExchange().getFormData().flatMap((data) -> {
+						if (data.getFirst("_spring_security_internal_logout") == null) {
+							return this.left.logout(exchange, authentication);
+						}
+						else {
+							return this.right.logout(exchange, authentication);
+						}
+					});
+				}
+
 			}
 
 		}

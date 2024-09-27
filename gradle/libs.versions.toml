@@ -10,7 +10,7 @@ org-aspectj = "1.9.22.1"
 org-bouncycastle = "1.78.1"
 org-eclipse-jetty = "11.0.24"
 org-jetbrains-kotlin = "1.9.25"
-org-jetbrains-kotlinx = "1.8.1"
+org-jetbrains-kotlinx = "1.9.0"
 org-mockito = "5.13.0"
 org-opensaml = "4.3.2"
 org-opensaml5 = "5.1.2"
@@ -70,12 +70,12 @@ org-bouncycastle-bcprov-jdk15on = { module = "org.bouncycastle:bcprov-jdk18on", 
 org-eclipse-jetty-jetty-server = { module = "org.eclipse.jetty:jetty-server", version.ref = "org-eclipse-jetty" }
 org-eclipse-jetty-jetty-servlet = { module = "org.eclipse.jetty:jetty-servlet", version.ref = "org-eclipse-jetty" }
 org-hamcrest = "org.hamcrest:hamcrest:2.2"
-org-hibernate-orm-hibernate-core = "org.hibernate.orm:hibernate-core:6.6.0.Final"
+org-hibernate-orm-hibernate-core = "org.hibernate.orm:hibernate-core:6.6.1.Final"
 org-hsqldb = "org.hsqldb:hsqldb:2.7.3"
 org-jetbrains-kotlin-kotlin-bom = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "org-jetbrains-kotlin" }
 org-jetbrains-kotlin-kotlin-gradle-plugin = "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.25"
 org-jetbrains-kotlinx-kotlinx-coroutines-bom = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "org-jetbrains-kotlinx" }
-org-junit-junit-bom = "org.junit:junit-bom:5.11.0"
+org-junit-junit-bom = "org.junit:junit-bom:5.11.1"
 org-mockito-mockito-bom = { module = "org.mockito:mockito-bom", version.ref = "org-mockito" }
 org-opensaml-opensaml-saml-api = { module = "org.opensaml:opensaml-saml-api", version.ref = "org-opensaml" }
 org-opensaml-opensaml-saml-impl = { module = "org.opensaml:opensaml-saml-impl", version.ref = "org-opensaml" }
@@ -83,12 +83,12 @@ org-opensaml-opensaml5-saml-api = { module = "org.opensaml:opensaml-saml-api", v
 org-opensaml-opensaml5-saml-impl = { module = "org.opensaml:opensaml-saml-impl", version.ref = "org-opensaml5" }
 org-python-jython = { module = "org.python:jython", version = "2.5.3" }
 org-seleniumhq-selenium-htmlunit-driver = "org.seleniumhq.selenium:htmlunit3-driver:4.23.0"
-org-seleniumhq-selenium-selenium-java = "org.seleniumhq.selenium:selenium-java:4.24.0"
+org-seleniumhq-selenium-selenium-java = "org.seleniumhq.selenium:selenium-java:4.25.0"
 org-seleniumhq-selenium-selenium-support = "org.seleniumhq.selenium:selenium-support:3.141.59"
 org-skyscreamer-jsonassert = "org.skyscreamer:jsonassert:1.5.3"
 org-slf4j-log4j-over-slf4j = "org.slf4j:log4j-over-slf4j:1.7.36"
 org-slf4j-slf4j-api = "org.slf4j:slf4j-api:2.0.16"
-org-springframework-data-spring-data-bom = "org.springframework.data:spring-data-bom:2024.0.3"
+org-springframework-data-spring-data-bom = "org.springframework.data:spring-data-bom:2024.0.4"
 org-springframework-ldap-spring-ldap-core = "org.springframework.ldap:spring-ldap-core:3.2.6"
 org-springframework-spring-framework-bom = { module = "org.springframework:spring-framework-bom", version.ref = "org-springframework" }
 org-synchronoss-cloud-nio-multipart-parser = "org.synchronoss.cloud:nio-multipart-parser:1.1.0"
