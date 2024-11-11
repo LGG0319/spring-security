@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.authorization.AuthorizationEventPublisher;
 import org.springframework.security.authorization.AuthorizationManager;
+import org.springframework.security.authorization.AuthorizationResult;
 import org.springframework.security.authorization.event.AuthorizationDeniedEvent;
 import org.springframework.security.authorization.event.AuthorizationGrantedEvent;
 import org.springframework.security.core.Authentication;
@@ -58,7 +59,7 @@ public class AuthorizationFilter extends GenericFilterBean {
 
 	private final AuthorizationManager<HttpServletRequest> authorizationManager;
 
-	private AuthorizationEventPublisher eventPublisher = AuthorizationFilter::noPublish;
+	private AuthorizationEventPublisher eventPublisher = new NoopAuthorizationEventPublisher();
 
 	private boolean observeOncePerRequest = false;
 
@@ -102,12 +103,12 @@ public class AuthorizationFilter extends GenericFilterBean {
 			// this::getAuthentication -> 获取用户的认证信息
 			// request： 当前请求
 			// AuthorizationDecision: 授权描述  decision.isGranted() 表示是否有该资源的权限
-			AuthorizationDecision decision = this.authorizationManager.check(this::getAuthentication, request);
+			AuthorizationResult result = this.authorizationManager.authorize(this::getAuthentication, request);
 			// 发布一个认证的消息
-			this.eventPublisher.publishAuthorizationEvent(this::getAuthentication, request, decision);
+			this.eventPublisher.publishAuthorizationEvent(this::getAuthentication, request, result);
 			// 如果未授权，抛出异常AccessDeniedException
-			if (decision != null && !decision.isGranted()) {
-				throw new AuthorizationDeniedException("Access Denied", decision);
+			if (result != null && !result.isGranted()) {
+				throw new AuthorizationDeniedException("Access Denied", result);
 			}
 			// 已授权 继续向后执行
 			chain.doFilter(request, response);
@@ -122,10 +123,8 @@ public class AuthorizationFilter extends GenericFilterBean {
 		if (DispatcherType.ERROR.equals(request.getDispatcherType()) && !this.filterErrorDispatch) {
 			return true;
 		}
-		if (DispatcherType.ASYNC.equals(request.getDispatcherType()) && !this.filterAsyncDispatch) {
-			return true;
-		}
-		return false;
+
+		return DispatcherType.ASYNC.equals(request.getDispatcherType()) && !this.filterAsyncDispatch;
 	}
 
 	private boolean isApplied(HttpServletRequest request) {
@@ -209,11 +208,6 @@ public class AuthorizationFilter extends GenericFilterBean {
 		this.filterAsyncDispatch = shouldFilterAllDispatcherTypes;
 	}
 
-	private static <T> void noPublish(Supplier<Authentication> authentication, T object,
-			AuthorizationDecision decision) {
-
-	}
-
 	public boolean isObserveOncePerRequest() {
 		return this.observeOncePerRequest;
 	}
@@ -247,6 +241,21 @@ public class AuthorizationFilter extends GenericFilterBean {
 	 */
 	public void setFilterAsyncDispatch(boolean filterAsyncDispatch) {
 		this.filterAsyncDispatch = filterAsyncDispatch;
+	}
+
+	private static class NoopAuthorizationEventPublisher implements AuthorizationEventPublisher {
+
+		@Override
+		public <T> void publishAuthorizationEvent(Supplier<Authentication> authentication, T object,
+				AuthorizationDecision decision) {
+
+		}
+
+		@Override
+		public <T> void publishAuthorizationEvent(Supplier<Authentication> authentication, T object,
+				AuthorizationResult result) {
+		}
+
 	}
 
 }
