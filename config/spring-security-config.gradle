@@ -122,6 +122,8 @@ dependencies {
 		exclude group: "org.slf4j", module: "jcl-over-slf4j"
 	}
 	testImplementation libs.org.instancio.instancio.junit
+	testImplementation libs.org.eclipse.jetty.jetty.server
+	testImplementation libs.org.eclipse.jetty.jetty.servlet
 
 	testRuntimeOnly 'org.hsqldb:hsqldb'
 }
@@ -167,6 +169,17 @@ tasks.withType(KotlinCompile).configureEach {
 configure(project.tasks.withType(Test)) {
 	doFirst {
 		systemProperties['springSecurityVersion'] = version
+	}
+}
+
+test {
+	onOutput { descriptor, event ->
+		if (!project.hasProperty('serialization')) {
+			return
+		}
+		if (descriptor.name=='listClassesMissingSerialVersion()') {
+			logger.lifecycle(event.message)
+		}
 	}
 }
 

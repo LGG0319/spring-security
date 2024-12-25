@@ -18,11 +18,13 @@ package org.springframework.security.ldap.userdetails;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.Serial;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Locale;
 
 import javax.naming.Context;
 import javax.naming.NameNotFoundException;
@@ -125,7 +127,7 @@ public class LdapUserDetailsManager implements UserDetailsManager {
 		NamingEnumeration<?> ne = roleAttr.getAll();
 		Object group = ne.next();
 		String role = group.toString();
-		return new SimpleGrantedAuthority(this.rolePrefix + role.toUpperCase());
+		return new SimpleGrantedAuthority(this.rolePrefix + role.toUpperCase(Locale.ROOT));
 	};
 
 	private String[] attributesToRetrieve;
@@ -292,7 +294,7 @@ public class LdapUserDetailsManager implements UserDetailsManager {
 	@Deprecated
 	protected DistinguishedName buildGroupDn(String group) {
 		DistinguishedName dn = new DistinguishedName(this.groupSearchBase);
-		dn.add(this.groupRoleAttributeName, group.toLowerCase());
+		dn.add(this.groupRoleAttributeName, group.toLowerCase(Locale.ROOT));
 		return dn;
 	}
 
@@ -489,6 +491,9 @@ public class LdapUserDetailsManager implements UserDetailsManager {
 	 * @since 4.2.9
 	 */
 	private static class PasswordModifyRequest implements ExtendedRequest {
+
+		@Serial
+		private static final long serialVersionUID = 3154223576081503237L;
 
 		private static final byte SEQUENCE_TYPE = 48;
 
