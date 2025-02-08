@@ -99,6 +99,9 @@ import org.springframework.security.authentication.jaas.event.JaasAuthentication
 import org.springframework.security.authentication.ott.InvalidOneTimeTokenException;
 import org.springframework.security.authentication.ott.OneTimeTokenAuthenticationToken;
 import org.springframework.security.authentication.password.CompromisedPasswordException;
+import org.springframework.security.authorization.AuthorityAuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.cas.authentication.CasAssertionAuthenticationToken;
 import org.springframework.security.cas.authentication.CasAuthenticationToken;
 import org.springframework.security.cas.authentication.CasServiceTicketAuthenticationToken;
@@ -178,14 +181,21 @@ import org.springframework.security.oauth2.server.resource.introspection.OAuth2I
 import org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionException;
 import org.springframework.security.saml2.Saml2Exception;
 import org.springframework.security.saml2.core.Saml2Error;
+import org.springframework.security.saml2.core.Saml2X509Credential;
+import org.springframework.security.saml2.credentials.TestSaml2X509Credentials;
 import org.springframework.security.saml2.provider.service.authentication.DefaultSaml2AuthenticatedPrincipal;
 import org.springframework.security.saml2.provider.service.authentication.Saml2Authentication;
 import org.springframework.security.saml2.provider.service.authentication.Saml2AuthenticationException;
+import org.springframework.security.saml2.provider.service.authentication.Saml2AuthenticationToken;
 import org.springframework.security.saml2.provider.service.authentication.Saml2PostAuthenticationRequest;
 import org.springframework.security.saml2.provider.service.authentication.Saml2RedirectAuthenticationRequest;
+import org.springframework.security.saml2.provider.service.authentication.TestSaml2AuthenticationTokens;
 import org.springframework.security.saml2.provider.service.authentication.TestSaml2Authentications;
 import org.springframework.security.saml2.provider.service.authentication.TestSaml2PostAuthenticationRequests;
 import org.springframework.security.saml2.provider.service.authentication.TestSaml2RedirectAuthenticationRequests;
+import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistration;
+import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistration.AssertingPartyDetails;
+import org.springframework.security.saml2.provider.service.registration.TestRelyingPartyRegistrations;
 import org.springframework.security.web.PortResolverImpl;
 import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
@@ -464,6 +474,11 @@ class SpringSecurityCoreVersionSerializableTests {
 		generatorByClassName.put(AbstractSessionEvent.class, (r) -> new AbstractSessionEvent(securityContext));
 		generatorByClassName.put(SecurityConfig.class, (r) -> new SecurityConfig("value"));
 		generatorByClassName.put(TransientSecurityContext.class, (r) -> new TransientSecurityContext(authentication));
+		generatorByClassName.put(AuthorizationDeniedException.class,
+				(r) -> new AuthorizationDeniedException("message", new AuthorizationDecision(false)));
+		generatorByClassName.put(AuthorizationDecision.class, (r) -> new AuthorizationDecision(true));
+		generatorByClassName.put(AuthorityAuthorizationDecision.class,
+				(r) -> new AuthorityAuthorizationDecision(true, AuthorityUtils.createAuthorityList("ROLE_USER")));
 
 		// cas
 		generatorByClassName.put(CasServiceTicketAuthenticationToken.class, (r) -> {
@@ -507,6 +522,16 @@ class SpringSecurityCoreVersionSerializableTests {
 				(r) -> TestSaml2PostAuthenticationRequests.create());
 		generatorByClassName.put(Saml2RedirectAuthenticationRequest.class,
 				(r) -> TestSaml2RedirectAuthenticationRequests.create());
+		generatorByClassName.put(Saml2X509Credential.class,
+				(r) -> TestSaml2X509Credentials.relyingPartyVerifyingCredential());
+		generatorByClassName.put(AssertingPartyDetails.class,
+				(r) -> TestRelyingPartyRegistrations.full().build().getAssertingPartyMetadata());
+		generatorByClassName.put(RelyingPartyRegistration.class, (r) -> TestRelyingPartyRegistrations.full().build());
+		generatorByClassName.put(Saml2AuthenticationToken.class, (r) -> {
+			Saml2AuthenticationToken token = TestSaml2AuthenticationTokens.tokenRequested();
+			token.setDetails(details);
+			return token;
+		});
 
 		// web
 		generatorByClassName.put(AnonymousAuthenticationToken.class, (r) -> {

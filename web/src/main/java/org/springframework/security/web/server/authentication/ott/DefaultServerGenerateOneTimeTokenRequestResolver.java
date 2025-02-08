@@ -14,36 +14,40 @@
  * limitations under the License.
  */
 
-package org.springframework.security.web.authentication.ott;
+package org.springframework.security.web.server.authentication.ott;
 
 import java.time.Duration;
 
-import jakarta.servlet.http.HttpServletRequest;
+import reactor.core.publisher.Mono;
 
 import org.springframework.security.authentication.ott.GenerateOneTimeTokenRequest;
 import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
+import org.springframework.web.server.ServerWebExchange;
 
 /**
- * Default implementation of {@link GenerateOneTimeTokenRequestResolver}. Resolves
+ * Default implementation of {@link ServerGenerateOneTimeTokenRequestResolver}. Resolves
  * {@link GenerateOneTimeTokenRequest} from username parameter.
  *
  * @author Max Batischev
  * @since 6.5
  */
-public final class DefaultGenerateOneTimeTokenRequestResolver implements GenerateOneTimeTokenRequestResolver {
+public final class DefaultServerGenerateOneTimeTokenRequestResolver
+		implements ServerGenerateOneTimeTokenRequestResolver {
+
+	private static final String USERNAME = "username";
 
 	private static final Duration DEFAULT_EXPIRES_IN = Duration.ofMinutes(5);
 
 	private Duration expiresIn = DEFAULT_EXPIRES_IN;
 
 	@Override
-	public GenerateOneTimeTokenRequest resolve(HttpServletRequest request) {
-		String username = request.getParameter("username");
-		if (!StringUtils.hasText(username)) {
-			return null;
-		}
-		return new GenerateOneTimeTokenRequest(username, this.expiresIn);
+	public Mono<GenerateOneTimeTokenRequest> resolve(ServerWebExchange exchange) {
+		// @formatter:off
+		return exchange.getFormData()
+				.mapNotNull((data) -> data.getFirst(USERNAME))
+				.switchIfEmpty(Mono.empty())
+				.map((username) -> new GenerateOneTimeTokenRequest(username, this.expiresIn));
+		// @formatter:on
 	}
 
 	/**
