@@ -33,6 +33,7 @@ import java.util.function.Function;
 import javax.crypto.SecretKey;
 
 import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.KeySourceException;
 import com.nimbusds.jose.RemoteKeySourceException;
@@ -41,6 +42,8 @@ import com.nimbusds.jose.jwk.source.JWKSetCacheRefreshEvaluator;
 import com.nimbusds.jose.jwk.source.JWKSetSource;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier;
+import com.nimbusds.jose.proc.JOSEObjectTypeVerifier;
 import com.nimbusds.jose.proc.JWSKeySelector;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
@@ -127,7 +130,7 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 	 * Decode and validate the JWT from its compact claims representation format
 	 * @param token the JWT value
 	 * @return a validated {@link Jwt}
-	 * @throws JwtException
+	 * @throws JwtException when the token is malformed or otherwise invalid
 	 */
 	@Override
 	public Jwt decode(String token) throws JwtException {
@@ -265,12 +268,20 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 	 */
 	public static final class JwkSetUriJwtDecoderBuilder {
 
-		private Function<RestOperations, String> jwkSetUri;
+		private static final JOSEObjectTypeVerifier<SecurityContext> JWT_TYPE_VERIFIER = new DefaultJOSEObjectTypeVerifier<>(
+				JOSEObjectType.JWT, null);
+
+		private static final JOSEObjectTypeVerifier<SecurityContext> NO_TYPE_VERIFIER = (header, context) -> {
+		};
+
+		private final Function<RestOperations, String> jwkSetUri;
 
 		private Function<JWKSource<SecurityContext>, Set<JWSAlgorithm>> defaultAlgorithms = (source) -> Set
 			.of(JWSAlgorithm.RS256);
 
-		private Set<SignatureAlgorithm> signatureAlgorithms = new HashSet<>();
+		private JOSEObjectTypeVerifier<SecurityContext> typeVerifier = JWT_TYPE_VERIFIER;
+
+		private final Set<SignatureAlgorithm> signatureAlgorithms = new HashSet<>();
 
 		private RestOperations restOperations = new RestTemplate();
 
@@ -293,6 +304,53 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 			this.defaultAlgorithms = defaultAlgorithms;
 			this.jwtProcessorCustomizer = (processor) -> {
 			};
+		}
+
+		/**
+		 * Whether to use Nimbus's typ header verification. This is {@code true} by
+		 * default, however it may change to {@code false} in a future major release.
+		 *
+		 * <p>
+		 * By turning off this feature, {@link NimbusJwtDecoder} expects applications to
+		 * check the {@code typ} header themselves in order to determine what kind of
+		 * validation is needed
+		 * </p>
+		 *
+		 * <p>
+		 * This is done for you when you use {@link JwtValidators} to construct a
+		 * validator.
+		 *
+		 * <p>
+		 * That means that this: <code>
+		 *     NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withIssuerLocation(issuer).build();
+		 *     jwtDecoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer);
+		 * </code>
+		 *
+		 * <p>
+		 * Is equivalent to this: <code>
+		 *     NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withIssuerLocation(issuer)
+		 *         .validateType(false)
+		 *         .build();
+		 *     jwtDecoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
+		 *     		new JwtIssuerValidator(issuer), JwtTypeValidator.jwt());
+		 * </code>
+		 *
+		 * <p>
+		 * The difference is that by setting this to {@code false}, it allows you to
+		 * provide validation by type, like for {@code at+jwt}: <code>
+		 *     NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withIssuerLocation(issuer)
+		 *         .validateType(false)
+		 *         .build();
+		 *     jwtDecoder.setJwtValidator(new MyAtJwtValidator());
+		 * </code>
+		 * @param shouldValidateTypHeader whether Nimbus should validate the typ header or
+		 * not
+		 * @return a {@link JwkSetUriJwtDecoderBuilder} for further configurations
+		 * @since 6.5
+		 */
+		public JwkSetUriJwtDecoderBuilder validateType(boolean shouldValidateTypHeader) {
+			this.typeVerifier = shouldValidateTypHeader ? JWT_TYPE_VERIFIER : NO_TYPE_VERIFIER;
+			return this;
 		}
 
 		/**
@@ -328,8 +386,8 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 		 * <a href="https://tools.ietf.org/html/rfc7517#section-5">JWK Set</a> uri as well
 		 * as the <a href=
 		 * "https://openid.net/specs/openid-connect-core-1_0.html#IssuerIdentifier">Issuer</a>.
-		 * @param restOperations
-		 * @return
+		 * @param restOperations the {@link RestOperations} instance to use
+		 * @return a {@link JwkSetUriJwtDecoderBuilder} for further configurations
 		 */
 		public JwkSetUriJwtDecoderBuilder restOperations(RestOperations restOperations) {
 			Assert.notNull(restOperations, "restOperations cannot be null");
@@ -389,6 +447,7 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 		JWTProcessor<SecurityContext> processor() {
 			JWKSource<SecurityContext> jwkSource = jwkSource();
 			ConfigurableJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
+			jwtProcessor.setJWSTypeVerifier(this.typeVerifier);
 			jwtProcessor.setJWSKeySelector(jwsKeySelector(jwkSource));
 			// Spring Security validates the claim set independent from Nimbus
 			jwtProcessor.setJWTClaimsSetVerifier((claims, context) -> {
@@ -481,9 +540,17 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 	 */
 	public static final class PublicKeyJwtDecoderBuilder {
 
+		private static final JOSEObjectTypeVerifier<SecurityContext> JWT_TYPE_VERIFIER = new DefaultJOSEObjectTypeVerifier<>(
+				JOSEObjectType.JWT, null);
+
+		private static final JOSEObjectTypeVerifier<SecurityContext> NO_TYPE_VERIFIER = (header, context) -> {
+		};
+
 		private JWSAlgorithm jwsAlgorithm;
 
-		private RSAPublicKey key;
+		private JOSEObjectTypeVerifier<SecurityContext> typeVerifier = JWT_TYPE_VERIFIER;
+
+		private final RSAPublicKey key;
 
 		private Consumer<ConfigurableJWTProcessor<SecurityContext>> jwtProcessorCustomizer;
 
@@ -496,11 +563,56 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 		}
 
 		/**
+		 * Whether to use Nimbus's typ header verification. This is {@code true} by
+		 * default, however it may change to {@code false} in a future major release.
+		 *
+		 * <p>
+		 * By turning off this feature, {@link NimbusJwtDecoder} expects applications to
+		 * check the {@code typ} header themselves in order to determine what kind of
+		 * validation is needed
+		 * </p>
+		 *
+		 * <p>
+		 * This is done for you when you use {@link JwtValidators} to construct a
+		 * validator.
+		 *
+		 * <p>
+		 * That means that this: <code>
+		 *     NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withIssuerLocation(issuer).build();
+		 *     jwtDecoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer);
+		 * </code>
+		 *
+		 * <p>
+		 * Is equivalent to this: <code>
+		 *     NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withIssuerLocation(issuer)
+		 *         .validateType(false)
+		 *         .build();
+		 *     jwtDecoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
+		 *     		new JwtIssuerValidator(issuer), JwtTypeValidator.jwt());
+		 * </code>
+		 *
+		 * <p>
+		 * The difference is that by setting this to {@code false}, it allows you to
+		 * provide validation by type, like for {@code at+jwt}: <code>
+		 *     NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withIssuerLocation(issuer)
+		 *         .validateType(false)
+		 *         .build();
+		 *     jwtDecoder.setJwtValidator(new MyAtJwtValidator());
+		 * </code>
+		 * @param shouldValidateTypHeader whether Nimbus should validate the typ header or
+		 * not
+		 * @return a {@link JwkSetUriJwtDecoderBuilder} for further configurations
+		 * @since 6.5
+		 */
+		public PublicKeyJwtDecoderBuilder validateType(boolean shouldValidateTypHeader) {
+			this.typeVerifier = shouldValidateTypHeader ? JWT_TYPE_VERIFIER : NO_TYPE_VERIFIER;
+			return this;
+		}
+
+		/**
 		 * Use the given signing
 		 * <a href="https://tools.ietf.org/html/rfc7515#section-4.1.1" target=
-		 * "_blank">algorithm</a>.
-		 *
-		 * The value should be one of
+		 * "_blank">algorithm</a>. The value should be one of
 		 * <a href="https://tools.ietf.org/html/rfc7518#section-3.3" target=
 		 * "_blank">RS256, RS384, or RS512</a>.
 		 * @param signatureAlgorithm the algorithm to use
@@ -533,6 +645,7 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 							+ this.jwsAlgorithm + ". Please indicate one of RS256, RS384, or RS512.");
 			JWSKeySelector<SecurityContext> jwsKeySelector = new SingleKeyJWSKeySelector<>(this.jwsAlgorithm, this.key);
 			DefaultJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
+			jwtProcessor.setJWSTypeVerifier(this.typeVerifier);
 			jwtProcessor.setJWSKeySelector(jwsKeySelector);
 			// Spring Security validates the claim set independent from Nimbus
 			jwtProcessor.setJWTClaimsSetVerifier((claims, context) -> {
@@ -557,9 +670,17 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 	 */
 	public static final class SecretKeyJwtDecoderBuilder {
 
+		private static final JOSEObjectTypeVerifier<SecurityContext> JWT_TYPE_VERIFIER = new DefaultJOSEObjectTypeVerifier<>(
+				JOSEObjectType.JWT, null);
+
+		private static final JOSEObjectTypeVerifier<SecurityContext> NO_TYPE_VERIFIER = (header, context) -> {
+		};
+
 		private final SecretKey secretKey;
 
 		private JWSAlgorithm jwsAlgorithm = JWSAlgorithm.HS256;
+
+		private JOSEObjectTypeVerifier<SecurityContext> typeVerifier = JWT_TYPE_VERIFIER;
 
 		private Consumer<ConfigurableJWTProcessor<SecurityContext>> jwtProcessorCustomizer;
 
@@ -571,11 +692,56 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 		}
 
 		/**
+		 * Whether to use Nimbus's typ header verification. This is {@code true} by
+		 * default, however it may change to {@code false} in a future major release.
+		 *
+		 * <p>
+		 * By turning off this feature, {@link NimbusJwtDecoder} expects applications to
+		 * check the {@code typ} header themselves in order to determine what kind of
+		 * validation is needed
+		 * </p>
+		 *
+		 * <p>
+		 * This is done for you when you use {@link JwtValidators} to construct a
+		 * validator.
+		 *
+		 * <p>
+		 * That means that this: <code>
+		 *     NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withIssuerLocation(issuer).build();
+		 *     jwtDecoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer);
+		 * </code>
+		 *
+		 * <p>
+		 * Is equivalent to this: <code>
+		 *     NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withIssuerLocation(issuer)
+		 *         .validateType(false)
+		 *         .build();
+		 *     jwtDecoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
+		 *     		new JwtIssuerValidator(issuer), JwtTypeValidator.jwt());
+		 * </code>
+		 *
+		 * <p>
+		 * The difference is that by setting this to {@code false}, it allows you to
+		 * provide validation by type, like for {@code at+jwt}: <code>
+		 *     NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withIssuerLocation(issuer)
+		 *         .validateType(false)
+		 *         .build();
+		 *     jwtDecoder.setJwtValidator(new MyAtJwtValidator());
+		 * </code>
+		 * @param shouldValidateTypHeader whether Nimbus should validate the typ header or
+		 * not
+		 * @return a {@link JwkSetUriJwtDecoderBuilder} for further configurations
+		 * @since 6.5
+		 */
+		public SecretKeyJwtDecoderBuilder validateType(boolean shouldValidateTypHeader) {
+			this.typeVerifier = shouldValidateTypHeader ? JWT_TYPE_VERIFIER : NO_TYPE_VERIFIER;
+			return this;
+		}
+
+		/**
 		 * Use the given
 		 * <a href="https://tools.ietf.org/html/rfc7515#section-4.1.1" target=
-		 * "_blank">algorithm</a> when generating the MAC.
-		 *
-		 * The value should be one of
+		 * "_blank">algorithm</a> when generating the MAC. The value should be one of
 		 * <a href="https://tools.ietf.org/html/rfc7518#section-3.2" target=
 		 * "_blank">HS256, HS384 or HS512</a>.
 		 * @param macAlgorithm the MAC algorithm to use
@@ -615,6 +781,7 @@ public final class NimbusJwtDecoder implements JwtDecoder {
 					this.secretKey);
 			DefaultJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
 			jwtProcessor.setJWSKeySelector(jwsKeySelector);
+			jwtProcessor.setJWSTypeVerifier(this.typeVerifier);
 			// Spring Security validates the claim set independent from Nimbus
 			jwtProcessor.setJWTClaimsSetVerifier((claims, context) -> {
 			});
